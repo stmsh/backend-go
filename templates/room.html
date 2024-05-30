@@ -1,0 +1,213 @@
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Room {{.ID}}</title>
+
+        <script
+            src="https://unpkg.com/htmx.org@1.9.12"
+            integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
+            crossorigin="anonymous"
+        ></script>
+        <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"></script>
+    </head>
+    <body>
+        <h1>#{{.ID}}</h1>
+
+        <div id="time"></div>
+
+        <div>
+            <div id="players"></div>
+            <div id="user"></div>
+        </div>
+
+        <main>
+            <div id="stage"></div>
+
+            <div id="actions"></div>
+        </main>
+    </body>
+
+    <script>
+        const roomId = location.pathname.split("/").pop();
+        document.body.setAttribute("hx-ext", "ws");
+        document.body.setAttribute("ws-connect", "/ws?htmx=true");
+
+        document.addEventListener("htmx:wsOpen", (event) => {
+            event.detail.socketWrapper.send(
+                JSON.stringify(
+                    {
+                        type: "join",
+                        payload: {
+                            name: getCookie("name"),
+                            roomid: roomId,
+                        },
+                    },
+                    document.body
+                )
+            );
+        });
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(";").at(0);
+        }
+    </script>
+</html>
+<!---->
+
+{{ define "user" }}
+<div id="user">{{ .Name }} {{ if .IsHost }}(Host){{ end }}</div>
+{{ end }}
+<!---->
+
+{{ define "players" }}
+<div id="players">
+    <button popovertarget="players__expanded">
+        ✓ {{ .Ready }}/{{ .Total }}
+    </button>
+
+    <ul popover id="players__expanded">
+        {{ range .Players }}
+        <li>
+            {{ if .Ready }} ✓ {{ end }} {{ .Name }} {{ if .IsHost }}(Host){{ end
+            }}
+        </li>
+        {{ end }}
+    </ul>
+</div>
+{{ end }}
+<!---->
+
+{{ define "actions" }}
+<div id="actions">
+    <label>
+        <input
+            type="checkbox"
+            {{if
+            .Ready}}checked{{end}}
+            ws-send
+            hx-vals='js:{"type":"ready", "payload": {"ready": event.target.checked }}'
+        />
+        Ready
+    </label>
+
+    {{ if .IsHost }}
+    <button ws-send hx-vals='js:{"type":"next_stage"}'>Next</button>
+
+    {{ template "timer" . }}
+    <!---->
+    {{ end }}
+</div>
+{{ end }}
+<!---->
+
+{{ define "timer" }}
+<div id="timer">
+    <form
+        ws-send
+        hx-vals='js:{
+        "type": "set_timer",
+        "payload": { 
+            "time_in_seconds": Number(event.target.minutes.value) * 60 + Number(event.target.seconds.value)}
+        }'
+    >
+        <div>
+            <input type="number" name="minutes" min="0" value="0" />
+            <input type="number" name="seconds" min="0" max="59" value="0" />
+        </div>
+
+        <button type="submit">Set</button>
+        <button type="reset">Clear</button>
+    </form>
+</div>
+{{ end }}
+<!---->
+
+{{ define "time" }}
+<div id="time">{{ format_duration . }}</div>
+{{ end }}
+<!---->
+
+{{ define "search" }}
+<form
+    id="search"
+    ws-send
+    hx-vals='js:{"type": "list_add", "payload": { "name": event.target.name.value }}'
+>
+    <input type="text" name="name" />
+    <button type="submit">Add to list</button>
+</form>
+{{ end }}
+<!---->
+
+{{ define "list" }}
+<ul id="list">
+    {{ range . }}
+    <li>
+        <span>{{ .Name }}</span>
+        <button
+            ws-send
+            hx-vals='js:{"type": "list_remove", "payload": { "name": "{{ .Name }}" }}'
+        >
+            Remove
+        </button>
+    </li>
+    {{ end }}
+</ul>
+{{ end }}
+<!---->
+
+{{ define "stage_lobby" }}
+<div id="stage">
+    {{ template "search" }}
+    <!---->
+    {{ template "list" .List }}
+</div>
+{{ end }}
+<!---->
+
+{{ define "candidates" }}
+<ul id="candidates">
+    {{ range . }}
+    <li>
+        <span> {{ .Name }} (Suggested by {{ .SuggestedBy }}) </span>
+        <button
+            ws-send
+            hx-vals='js:{"type": "vote", "payload": { "name": "{{ .Name }}", "vote": true }}'
+        >
+            +1
+        </button>
+        <button
+            ws-send
+            hx-vals='js:{"type": "vote", "payload": { "name": "{{ .Name }}", "vote": false }}'
+        >
+            -1
+        </button>
+    </li>
+    {{ end }}
+</ul>
+{{ end }}
+<!---->
+
+{{ define "stage_voting" }}
+<div id="stage">
+    {{ template "candidates" .Candidates }}
+    <!---->
+</div>
+{{ end }}
+<!---->
+
+{{ define "stage_results" }}
+<div id="stage">
+    <ul>
+        {{ range .Results }}
+        <li>
+            <span>{{ .Name }} ({{ .Score }})</span>
+        </li>
+        {{ end }}
+    </ul>
+    <!---->
+</div>
+{{ end }}

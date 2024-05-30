@@ -1,0 +1,27 @@
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Welcome</title>
+
+        <script
+            src="https://unpkg.com/htmx.org@1.9.12"
+            integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
+            crossorigin="anonymous"
+        ></script>
+    </head>
+    <body>
+        <form hx-post="/first-time" hx-target="#error" hx-swap="innerHTML">
+            <input
+                type="text"
+                name="name"
+                placeholder="Enter user name"
+                required
+                minlength="3"
+            />
+            <div id="error"></div>
+
+            <button type="Submit">Next</button>
+        </form>
+    </body>
+</html>

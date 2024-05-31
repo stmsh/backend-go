@@ -9,9 +9,11 @@ import (
 )
 
 type Client struct {
+	ID     string
+	RoomID string
+
 	Conn       *websocket.Conn
 	Egress     chan Event
-	RoomID     string
 	Serializer Serializer
 }
 

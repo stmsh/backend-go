@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -87,6 +88,7 @@ func main() {
 		}
 
 		client := &Client{
+			ID:     uuid.NewString(),
 			Conn:   conn,
 			Egress: make(chan Event),
 		}

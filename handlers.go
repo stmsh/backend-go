@@ -68,14 +68,17 @@ func HandleJoin(sender *Client, msg Message) {
 	}
 
 	sender.RoomID = payload.RoomID
+	newPlayer := &Player{
+		ID:   sender.ID,
+		Name: payload.Name,
+	}
 
-	newPlayer := NewPlayer(payload.Name)
 	if len(room.Players) == 0 {
 		room.Host = newPlayer
 	}
 	room.Players[sender] = newPlayer
 
-	sender.Send(NewEventRoomInit(sender, room))
+	sender.Send(NewEventRoomInit(newPlayer, room))
 
 	playerJoined := NewEventPlayerJoined(newPlayer)
 	playersChanged := NewEventPlayersChanged(room)
@@ -386,7 +389,7 @@ const (
 	EventTypeListChanged   = "player:list_changed"
 )
 
-func NewEventRoomInit(c *Client, room *Room) EventRoomInit {
+func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 	players := make([]player, 0, len(room.Players))
 
 	for _, v := range room.Players {
@@ -398,7 +401,6 @@ func NewEventRoomInit(c *Client, room *Room) EventRoomInit {
 		})
 	}
 
-	user := room.Players[c]
 	list := make([]listItem, len(room.Lists[user.ID]))
 
 	for i, v := range room.Lists[user.ID] {

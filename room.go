@@ -42,7 +42,7 @@ type Candidate struct {
 // Room is directly tied to client implementation
 type Room struct {
 	ID                   string
-	Host                 *Client
+	Host                 *Player
 	Stage                RoomStage
 	Time                 time.Duration
 	ScheduledForDeletion bool

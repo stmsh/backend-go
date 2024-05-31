@@ -69,10 +69,10 @@ func HandleJoin(sender *Client, msg Message) {
 
 	sender.RoomID = payload.RoomID
 
-	if len(room.Players) == 0 {
-		room.Host = sender
-	}
 	newPlayer := NewPlayer(payload.Name)
+	if len(room.Players) == 0 {
+		room.Host = newPlayer
+	}
 	room.Players[sender] = newPlayer
 
 	sender.Send(NewEventRoomInit(sender, room))
@@ -111,12 +111,14 @@ func HandleLeave(sender *Client) {
 	if !ok {
 		return
 	}
+	deletedUser := room.Players[sender]
 	delete(room.Players, sender)
 
-	if room.Host == sender {
-		var nextHost *Client
-		for c := range room.Players {
-			nextHost = c
+	fmt.Printf("Host: %v, user: %v, equal: %t", room.Host, deletedUser, room.Host == deletedUser)
+	if room.Host == deletedUser {
+		var nextHost *Player
+		for _, p := range room.Players {
+			nextHost = p
 			break
 		}
 
@@ -124,12 +126,12 @@ func HandleLeave(sender *Client) {
 
 		if room.Host != nil {
 			hostChanged := NewHostChangedEvent(room)
-			for c := range room.Players {
+			for c, p := range room.Players {
 				// notify everyone that host changed
 				c.Send(hostChanged)
 				// notify new host that its data changed
-				if c == room.Host {
-					c.Send(NewPlayerUpdatedEvent(room.Players[c], room))
+				if p == room.Host {
+					c.Send(NewPlayerUpdatedEvent(p, room))
 				}
 			}
 		}
@@ -147,7 +149,8 @@ func HandleLeave(sender *Client) {
 
 func HandleChangeStage(sender *Client) {
 	room := rooms[sender.RoomID]
-	if sender != room.Host {
+	user := room.Players[sender]
+	if user != room.Host {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
 	}
@@ -177,7 +180,8 @@ func HandleChangeStage(sender *Client) {
 
 func HandleSetTimer(sender *Client, msg Message) {
 	room := rooms[sender.RoomID]
-	if sender != room.Host {
+	user := room.Players[sender]
+	if user != room.Host {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
 	}
@@ -385,12 +389,12 @@ const (
 func NewEventRoomInit(c *Client, room *Room) EventRoomInit {
 	players := make([]player, 0, len(room.Players))
 
-	for k, v := range room.Players {
+	for _, v := range room.Players {
 		players = append(players, player{
 			ID:     v.ID,
 			Name:   v.Name,
 			Ready:  v.Ready,
-			IsHost: k == room.Host,
+			IsHost: v == room.Host,
 		})
 	}
 
@@ -409,7 +413,7 @@ func NewEventRoomInit(c *Client, room *Room) EventRoomInit {
 			ID:     user.ID,
 			Name:   user.Name,
 			Ready:  user.Ready,
-			IsHost: room.Host == c,
+			IsHost: room.Host == user,
 		},
 		Time:       room.Time,
 		List:       list,
@@ -433,7 +437,7 @@ func NewEventPlayersChanged(room *Room) EventPlayersChanged {
 	total := len(room.Players)
 	players := make([]player, 0, total)
 
-	for k, v := range room.Players {
+	for _, v := range room.Players {
 		if v.Ready {
 			ready++
 		}
@@ -442,7 +446,7 @@ func NewEventPlayersChanged(room *Room) EventPlayersChanged {
 			ID:     v.ID,
 			Name:   v.Name,
 			Ready:  v.Ready,
-			IsHost: k == room.Host,
+			IsHost: v == room.Host,
 		})
 	}
 
@@ -460,16 +464,15 @@ func NewPlayerUpdatedEvent(p *Player, room *Room) EventPlayerUpdated {
 		ID:     p.ID,
 		Name:   p.Name,
 		Ready:  p.Ready,
-		IsHost: room.Players[room.Host] == p,
+		IsHost: room.Host == p,
 	}
 }
 
 func NewHostChangedEvent(room *Room) EventHostChanged {
-	host := room.Players[room.Host]
 
 	return EventHostChanged{
-		ID:   host.ID,
-		Name: host.Name,
+		ID:   room.Host.ID,
+		Name: room.Host.Name,
 	}
 }
 

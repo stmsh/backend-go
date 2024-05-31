@@ -72,7 +72,7 @@ func HandleJoin(sender *client.Client, msg client.MessageIncoming) {
 	if len(room.Players) == 0 {
 		room.Host = newPlayer
 	}
-	room.Players[sender] = newPlayer
+	room.Players[sender.ID] = newPlayer
 
 	sender.Send(NewEventRoomInit(newPlayer, room))
 
@@ -94,7 +94,7 @@ func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
 	}
 
 	room := rooms[sender.RoomID]
-	p := room.Players[sender]
+	p := room.Players[sender.ID]
 	p.Ready = payload.Ready
 
 	sender.Send(NewPlayerUpdatedEvent(p, room))
@@ -106,8 +106,8 @@ func HandleLeave(sender *client.Client) {
 	if !ok {
 		return
 	}
-	deletedUser := room.Players[sender]
-	delete(room.Players, sender)
+	deletedUser := room.Players[sender.ID]
+	delete(room.Players, sender.ID)
 
 	if room.Host == deletedUser {
 		var nextHost *Player
@@ -124,7 +124,7 @@ func HandleLeave(sender *client.Client) {
 				c.Send(hostChanged)
 				// notify new host that its data changed
 				if c.ID == room.Host.ID {
-					c.Send(NewPlayerUpdatedEvent(room.Players[c], room))
+					c.Send(NewPlayerUpdatedEvent(room.Players[c.ID], room))
 				}
 			})
 		}
@@ -139,7 +139,7 @@ func HandleLeave(sender *client.Client) {
 
 func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 	room := rooms[sender.RoomID]
-	user := room.Players[sender]
+	user := room.Players[sender.ID]
 	if user != room.Host {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
@@ -164,7 +164,7 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 
 func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
-	user := room.Players[sender]
+	user := room.Players[sender.ID]
 	if user != room.Host {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
@@ -188,7 +188,7 @@ func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 	}
 
 	room := rooms[sender.RoomID]
-	user := room.Players[sender]
+	user := room.Players[sender.ID]
 
 	room.Lists[user.ID] = append(
 		room.Lists[user.ID], ListItem{Name: payload.Name})
@@ -205,7 +205,7 @@ func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
 	}
 
 	room := rooms[sender.RoomID]
-	user := room.Players[sender]
+	user := room.Players[sender.ID]
 
 	updatedList := slices.DeleteFunc(room.Lists[user.ID], func(v ListItem) bool {
 		return v.Name == payload.Name
@@ -228,7 +228,7 @@ func HandleVote(sender *client.Client, msg client.MessageIncoming) {
 		return
 	}
 
-	user := room.Players[sender]
+	user := room.Players[sender.ID]
 	for i, candidate := range room.Candidates {
 		if candidate.Name == payload.Name {
 			if slices.Contains(candidate.Votes, user.ID) {

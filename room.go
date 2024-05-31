@@ -40,14 +40,13 @@ type Candidate struct {
 	Votes       []string
 }
 
-// Room is directly tied to client implementation
 type Room struct {
 	ID                   string
 	Host                 *Player
 	Stage                RoomStage
 	Time                 time.Duration
 	ScheduledForDeletion bool
-	Players              map[*client.Client]*Player
+	Players              map[string]*Player
 	Lists                map[string][]ListItem
 	Candidates           []Candidate
 }
@@ -61,7 +60,7 @@ func NewRoom() *Room {
 		Stage: StageLobby,
 		Host:  nil,
 
-		Players:    make(map[*client.Client]*Player),
+		Players:    make(map[string]*Player),
 		Lists:      make(map[string][]ListItem),
 		Candidates: nil,
 	}
@@ -87,7 +86,7 @@ func RunRoomCleanup() {
 	}
 }
 
-func RunRoomTimer() {
+func RunRoomTimer(manager *client.ConnectionManager) {
 	ticker := time.NewTicker(1 * time.Second)
 
 	for {
@@ -98,10 +97,7 @@ func RunRoomTimer() {
 			}
 
 			r.Time = r.Time - 1*time.Second
-			broad := NewEventRoomTime(r)
-			for c := range r.Players {
-				c.Send(broad)
-			}
+			manager.Broadcast(r.ID, NewEventRoomTime(r))
 		}
 	}
 }

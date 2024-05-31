@@ -120,7 +120,7 @@ func main() {
 		go client.ReadMessages()
 	})
 
-	go RunRoomTimer()
+	go RunRoomTimer(manager)
 	go RunRoomCleanup()
 
 	http.ListenAndServe(":8080", r)

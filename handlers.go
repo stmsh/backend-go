@@ -4,15 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"stmsh/client"
 	"time"
 )
 
 type (
-	Message struct {
-		Type    string          `json:"type"`
-		Payload json.RawMessage `json:"payload"`
-	}
-
 	MessageJoin struct {
 		Name   string `json:"name"`
 		RoomID string `json:"roomid"`
@@ -54,7 +50,7 @@ const (
 	MessageTypeVote            = "vote"
 )
 
-func HandleJoin(sender *Client, msg Message) {
+func HandleJoin(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageJoin
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -90,7 +86,7 @@ func HandleJoin(sender *Client, msg Message) {
 	}
 }
 
-func HandleToggleReady(sender *Client, msg Message) {
+func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageUserToggleReady
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -109,7 +105,7 @@ func HandleToggleReady(sender *Client, msg Message) {
 	sender.Send(NewPlayerUpdatedEvent(p, room))
 }
 
-func HandleLeave(sender *Client) {
+func HandleLeave(sender *client.Client) {
 	room, ok := rooms[sender.RoomID]
 	if !ok {
 		return
@@ -149,7 +145,7 @@ func HandleLeave(sender *Client) {
 	}
 }
 
-func HandleChangeStage(sender *Client) {
+func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender]
 	if user != room.Host {
@@ -180,7 +176,7 @@ func HandleChangeStage(sender *Client) {
 	}
 }
 
-func HandleSetTimer(sender *Client, msg Message) {
+func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender]
 	if user != room.Host {
@@ -202,7 +198,7 @@ func HandleSetTimer(sender *Client, msg Message) {
 	}
 }
 
-func HandleListAdd(sender *Client, msg Message) {
+func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageListAdd
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -219,7 +215,7 @@ func HandleListAdd(sender *Client, msg Message) {
 	sender.Send(listChanged)
 }
 
-func HandleListRemove(sender *Client, msg Message) {
+func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageListRemove
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -237,7 +233,7 @@ func HandleListRemove(sender *Client, msg Message) {
 	sender.Send(NewEventListChanged(updatedList))
 }
 
-func HandleVote(sender *Client, msg Message) {
+func HandleVote(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageVote
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -296,8 +292,6 @@ type (
 )
 
 type (
-	Event interface{}
-
 	EventRoomInit struct {
 		Type       string         `json:"type"`
 		User       player         `json:"user"`

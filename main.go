@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"stmsh/client"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -80,7 +80,24 @@ func main() {
 		w.Write(Render("room.html", room))
 	})
 
-	connectionManager := NewConnectionManager(HandleLeave)
+	manager := client.NewConnectionManager(HandleLeave)
+	EnsureRoom := func(handler client.EventHandler) client.EventHandler {
+		return func(c *client.Client, m client.MessageIncoming) {
+			if c.RoomID == "" {
+				c.ReportError(fmt.Errorf("Join room first"))
+				return
+			}
+
+			handler(c, m)
+		}
+	}
+	manager.RegisterEventHandler(MessageTypeJoin, HandleJoin)
+	manager.RegisterEventHandler(MessageTypeUserToggleReady, EnsureRoom(HandleToggleReady))
+	manager.RegisterEventHandler(MessageTypeNextStage, EnsureRoom(HandleChangeStage))
+	manager.RegisterEventHandler(MessageTypeSetTimer, EnsureRoom(HandleSetTimer))
+	manager.RegisterEventHandler(MessageTypeListAdd, EnsureRoom(HandleListAdd))
+	manager.RegisterEventHandler(MessageTypeListRemove, EnsureRoom(HandleListRemove))
+	manager.RegisterEventHandler(MessageTypeVote, EnsureRoom(HandleVote))
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -89,23 +106,18 @@ func main() {
 			return
 		}
 
-		client := &Client{
-			ID:     uuid.NewString(),
-			conn:   conn,
-			egress: make(chan Event),
-		}
-
 		isHtmx := r.URL.Query().Get("htmx") == "true"
+		var serializer client.Serializer
 		if isHtmx {
-			client.Serializer = htmxSerializer
+			serializer = htmxSerializer
 		} else {
-			client.Serializer = jsonSerializer
+			serializer = jsonSerializer
 		}
+		client := client.NewClient(conn, manager, serializer)
+		manager.AddClient(client)
 
-		connectionManager.AddClient(client)
-
-		go client.writeMessages()
-		go client.readMessages()
+		go client.WriteMessages()
+		go client.ReadMessages()
 	})
 
 	go RunRoomTimer()

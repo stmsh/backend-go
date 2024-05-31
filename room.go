@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"stmsh/client"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,7 +47,7 @@ type Room struct {
 	Stage                RoomStage
 	Time                 time.Duration
 	ScheduledForDeletion bool
-	Players              map[*Client]*Player
+	Players              map[*client.Client]*Player
 	Lists                map[string][]ListItem
 	Candidates           []Candidate
 }
@@ -60,7 +61,7 @@ func NewRoom() *Room {
 		Stage: StageLobby,
 		Host:  nil,
 
-		Players:    make(map[*Client]*Player),
+		Players:    make(map[*client.Client]*Player),
 		Lists:      make(map[string][]ListItem),
 		Candidates: nil,
 	}
@@ -87,21 +88,20 @@ func RunRoomCleanup() {
 }
 
 func RunRoomTimer() {
-	// TODO: Fix data race
-	// ticker := time.NewTicker(1 * time.Second)
-	//
-	// for {
-	// 	<-ticker.C
-	// 	for _, r := range rooms {
-	// 		if r.Time <= 0 {
-	// 			continue
-	// 		}
-	//
-	// 		r.Time = r.Time - 1*time.Second
-	// 		broad := NewEventRoomTime(r)
-	// 		for c := range r.Players {
-	// 			c.Send(broad)
-	// 		}
-	// 	}
-	// }
+	ticker := time.NewTicker(1 * time.Second)
+
+	for {
+		<-ticker.C
+		for _, r := range rooms {
+			if r.Time <= 0 {
+				continue
+			}
+
+			r.Time = r.Time - 1*time.Second
+			broad := NewEventRoomTime(r)
+			for c := range r.Players {
+				c.Send(broad)
+			}
+		}
+	}
 }

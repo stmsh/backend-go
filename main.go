@@ -80,6 +80,8 @@ func main() {
 		w.Write(Render("room.html", room))
 	})
 
+	connectionManager := NewConnectionManager(HandleLeave)
+
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -89,8 +91,8 @@ func main() {
 
 		client := &Client{
 			ID:     uuid.NewString(),
-			Conn:   conn,
-			Egress: make(chan Event),
+			conn:   conn,
+			egress: make(chan Event),
 		}
 
 		isHtmx := r.URL.Query().Get("htmx") == "true"
@@ -99,6 +101,8 @@ func main() {
 		} else {
 			client.Serializer = jsonSerializer
 		}
+
+		connectionManager.AddClient(client)
 
 		go client.writeMessages()
 		go client.readMessages()

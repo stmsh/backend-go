@@ -2,30 +2,101 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	BaseClientsCount = 100
+	BaseRoomsCount   = 10
 )
 
 type Client struct {
 	ID     string
 	RoomID string
 
-	Conn       *websocket.Conn
-	Egress     chan Event
+	conn   *websocket.Conn
+	egress chan Event
+
 	Serializer Serializer
+	Manager    *ConnectionManager
+}
+
+type ConnectionManager struct {
+	sync.RWMutex
+	clients map[string]*Client
+	rooms   map[string][]*Client
+
+	// Client will be removed from room before onLeave call.
+	// No messages will be delivered to disconnected client.
+	onLeave func(c *Client)
+}
+
+func NewConnectionManager(onLeave func(c *Client)) *ConnectionManager {
+	return &ConnectionManager{
+		clients: make(map[string]*Client, BaseClientsCount),
+		rooms:   make(map[string][]*Client, BaseRoomsCount),
+		onLeave: onLeave,
+	}
+}
+
+func (m *ConnectionManager) AddClient(c *Client) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.clients[c.ID] = c
+	c.Manager = m
+}
+
+func (m *ConnectionManager) AssignRoom(c *Client, roomID string) error {
+	m.Lock()
+	defer m.Unlock()
+
+	if slices.Contains(m.rooms[roomID], c) {
+		return fmt.Errorf("Client is already in the room")
+	}
+
+	m.rooms[roomID] = append(m.rooms[roomID], c)
+	c.RoomID = roomID
+
+	return nil
+}
+
+func (m *ConnectionManager) RemoveClient(c *Client) {
+	m.Lock()
+	defer m.Unlock()
+
+	delete(m.clients, c.ID)
+	close(c.egress)
+
+	room, ok := m.rooms[c.RoomID]
+	if ok {
+		m.rooms[c.RoomID] = slices.DeleteFunc(room, func(current *Client) bool {
+			if current == c {
+				return true
+			}
+			return false
+		})
+		m.onLeave(c)
+
+		// TODO: Clean up empty rooms
+	}
 }
 
 func (c *Client) readMessages() {
-	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.Conn.SetPongHandler(func(string) error {
-		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
 	for {
-		_, raw, err := c.Conn.ReadMessage()
+		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
@@ -33,8 +104,7 @@ func (c *Client) readMessages() {
 				log.Printf("error: %v", err)
 			}
 
-			HandleLeave(c)
-			close(c.Egress)
+			c.Manager.RemoveClient(c)
 			break
 		}
 
@@ -44,11 +114,11 @@ func (c *Client) readMessages() {
 			continue
 		}
 
-		routeMessage(c, msg)
+		c.Manager.routeMessage(c, msg)
 	}
 }
 
-func routeMessage(c *Client, msg Message) {
+func (m *ConnectionManager) routeMessage(c *Client, msg Message) {
 	if c.RoomID == "" {
 		if msg.Type == MessageTypeJoin {
 			HandleJoin(c, msg)
@@ -82,25 +152,25 @@ func (c *Client) writeMessages() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.Conn.Close()
+		c.conn.Close()
 	}()
 
 	for {
 		select {
-		case msg, ok := <-c.Egress:
+		case msg, ok := <-c.egress:
 			if !ok {
-				log.Println("Closing connection after channel got closed")
+				log.Printf("Client %s has disconnected", c.ID)
 				return
 			}
 
 			messageType, messages := c.Serializer.Serialize(msg)
 			for i := range messages {
-				c.Conn.WriteMessage(messageType, messages[i])
+				c.conn.WriteMessage(messageType, messages[i])
 			}
 
 		case <-ticker.C:
-			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := c.Conn.WriteMessage(websocket.PingMessage, nil)
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := c.conn.WriteMessage(websocket.PingMessage, nil)
 			if err != nil {
 				return
 			}
@@ -172,9 +242,9 @@ func (s *HtmxSerializer) Serialize(event Event) (messageType int, serialized [][
 }
 
 func (c *Client) ReportError(err error) {
-	c.Egress <- err
+	c.egress <- err
 }
 
 func (c *Client) Send(msg Event) {
-	c.Egress <- msg
+	c.egress <- msg
 }

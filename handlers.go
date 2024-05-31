@@ -66,8 +66,8 @@ func HandleJoin(sender *Client, msg Message) {
 		sender.ReportError(fmt.Errorf("Room doesn't exist"))
 		return
 	}
+	sender.Manager.AssignRoom(sender, payload.RoomID)
 
-	sender.RoomID = payload.RoomID
 	newPlayer := &Player{
 		ID:   sender.ID,
 		Name: payload.Name,
@@ -117,7 +117,6 @@ func HandleLeave(sender *Client) {
 	deletedUser := room.Players[sender]
 	delete(room.Players, sender)
 
-	fmt.Printf("Host: %v, user: %v, equal: %t", room.Host, deletedUser, room.Host == deletedUser)
 	if room.Host == deletedUser {
 		var nextHost *Player
 		for _, p := range room.Players {

@@ -78,12 +78,12 @@ func HandleJoin(sender *client.Client, msg client.MessageIncoming) {
 
 	playerJoined := NewEventPlayerJoined(newPlayer)
 	playersChanged := NewEventPlayersChanged(room)
-	for c := range room.Players {
+	sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
 		if c != sender {
 			c.Send(playerJoined)
 		}
 		c.Send(playersChanged)
-	}
+	})
 }
 
 func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
@@ -97,12 +97,8 @@ func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
 	p := room.Players[sender]
 	p.Ready = payload.Ready
 
-	broad := NewEventPlayersChanged(room)
-	for client := range room.Players {
-		client.Send(broad)
-	}
-
 	sender.Send(NewPlayerUpdatedEvent(p, room))
+	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
 }
 
 func HandleLeave(sender *client.Client) {
@@ -124,21 +120,17 @@ func HandleLeave(sender *client.Client) {
 
 		if room.Host != nil {
 			hostChanged := NewHostChangedEvent(room)
-			for c, p := range room.Players {
-				// notify everyone that host changed
+			sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
 				c.Send(hostChanged)
 				// notify new host that its data changed
-				if p == room.Host {
-					c.Send(NewPlayerUpdatedEvent(p, room))
+				if c.ID == room.Host.ID {
+					c.Send(NewPlayerUpdatedEvent(room.Players[c], room))
 				}
-			}
+			})
 		}
 	}
 
-	playersChanged := NewEventPlayersChanged(room)
-	for c := range room.Players {
-		c.Send(playersChanged)
-	}
+	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
 
 	if len(room.Players) == 0 {
 		room.ScheduledForDeletion = true
@@ -164,15 +156,9 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 	switch room.Stage {
 	case StageVoting:
 		room.Candidates = collectCandidates(room)
-		stageVoting := NewEventStageVoting(room)
-		for c := range room.Players {
-			c.Send(stageVoting)
-		}
+		sender.Manager.Broadcast(room.ID, NewEventStageVoting(room))
 	case StageResults:
-		stageResults := NewEventStageResults(room)
-		for c := range room.Players {
-			c.Send(stageResults)
-		}
+		sender.Manager.Broadcast(room.ID, NewEventStageResults(room))
 	}
 }
 
@@ -191,11 +177,7 @@ func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
 	}
 
 	room.Time = time.Duration(payload.TimeInSeconds) * time.Second
-
-	timerSet := NewTimerSetEvent(room)
-	for c := range room.Players {
-		c.Send(timerSet)
-	}
+	sender.Manager.Broadcast(room.ID, NewTimerSetEvent(room))
 }
 
 func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {

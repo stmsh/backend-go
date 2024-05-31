@@ -58,6 +58,74 @@ func NewClient(
 	}
 }
 
+func (c *Client) WriteMessages() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+
+	for {
+		select {
+		case msg, ok := <-c.egress:
+			if !ok {
+				log.Printf("Client %s has disconnected", c.ID)
+				return
+			}
+
+			messageType, messages := c.Serializer.Serialize(msg)
+			for i := range messages {
+				c.conn.WriteMessage(messageType, messages[i])
+			}
+
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := c.conn.WriteMessage(websocket.PingMessage, nil)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) ReadMessages() {
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	for {
+		_, raw, err := c.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(
+				err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
+			) {
+				log.Printf("error: %v", err)
+			}
+
+			c.Manager.RemoveClient(c)
+			break
+		}
+
+		var msg MessageIncoming
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			c.ReportError(err)
+			continue
+		}
+
+		c.Manager.handleMessage(c, msg)
+	}
+}
+
+func (c *Client) ReportError(err error) {
+	c.egress <- err
+}
+
+func (c *Client) Send(msg MessageOutgoing) {
+	c.egress <- msg
+}
+
 type EventHandler func(*Client, MessageIncoming)
 
 type ConnectionManager struct {
@@ -129,36 +197,6 @@ func (m *ConnectionManager) RegisterEventHandler(event string, handler EventHand
 	m.handlers[event] = handler
 }
 
-func (c *Client) ReadMessages() {
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
-	})
-
-	for {
-		_, raw, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(
-				err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
-			) {
-				log.Printf("error: %v", err)
-			}
-
-			c.Manager.RemoveClient(c)
-			break
-		}
-
-		var msg MessageIncoming
-		if err := json.Unmarshal(raw, &msg); err != nil {
-			c.ReportError(err)
-			continue
-		}
-
-		c.Manager.handleMessage(c, msg)
-	}
-}
-
 func (m *ConnectionManager) handleMessage(client *Client, message MessageIncoming) {
 	handler, ok := m.handlers[message.Type]
 	if !ok {
@@ -168,40 +206,26 @@ func (m *ConnectionManager) handleMessage(client *Client, message MessageIncomin
 	handler(client, message)
 }
 
-func (c *Client) WriteMessages() {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-		c.conn.Close()
-	}()
+func (m *ConnectionManager) Broadcast(roomID string, message MessageOutgoing) {
+	room, ok := m.rooms[roomID]
+	if !ok {
+		log.Println("Broadcast to non-existent room")
+		return
+	}
 
-	for {
-		select {
-		case msg, ok := <-c.egress:
-			if !ok {
-				log.Printf("Client %s has disconnected", c.ID)
-				return
-			}
-
-			messageType, messages := c.Serializer.Serialize(msg)
-			for i := range messages {
-				c.conn.WriteMessage(messageType, messages[i])
-			}
-
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := c.conn.WriteMessage(websocket.PingMessage, nil)
-			if err != nil {
-				return
-			}
-		}
+	for i := range room {
+		room[i].Send(message)
 	}
 }
 
-func (c *Client) ReportError(err error) {
-	c.egress <- err
-}
+func (m *ConnectionManager) BroadcastFunc(roomID string, sendFunc func(c *Client)) {
+	room, ok := m.rooms[roomID]
+	if !ok {
+		log.Println("Broadcast to non-existent room")
+		return
+	}
 
-func (c *Client) Send(msg MessageOutgoing) {
-	c.egress <- msg
+	for i := range room {
+		sendFunc(room[i])
+	}
 }

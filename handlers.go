@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"stmsh/client"
+	"strconv"
 	"time"
 )
 
@@ -27,15 +28,15 @@ type (
 	}
 
 	MessageListAdd struct {
-		Name string `json:"name"`
+		TMDBMovie
 	}
 
 	MessageListRemove struct {
-		Name string `json:"name"`
+		ID string `json:"id"`
 	}
 
 	MessageVote struct {
-		Name string `json:"name"`
+		ID   string `json:"id"`
 		Vote bool   `json:"vote"`
 	}
 )
@@ -190,8 +191,15 @@ func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender.ID]
 
-	room.Lists[user.ID] = append(
-		room.Lists[user.ID], ListItem{Name: payload.Name})
+	listItem := ListItem{
+		ID:         strconv.Itoa(payload.ID),
+		Title:      payload.Title,
+		Overview:   payload.Overview,
+		Rating:     payload.Rating,
+		Year:       0,
+		PosterPath: payload.PosterPath,
+	}
+	room.Lists[user.ID] = append(room.Lists[user.ID], listItem)
 
 	listChanged := NewEventListChanged(room.Lists[user.ID])
 	sender.Send(listChanged)
@@ -208,7 +216,7 @@ func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
 	user := room.Players[sender.ID]
 
 	updatedList := slices.DeleteFunc(room.Lists[user.ID], func(v ListItem) bool {
-		return v.Name == payload.Name
+		return v.ID == payload.ID
 	})
 
 	room.Lists[user.ID] = updatedList
@@ -230,10 +238,10 @@ func HandleVote(sender *client.Client, msg client.MessageIncoming) {
 
 	user := room.Players[sender.ID]
 	for i, candidate := range room.Candidates {
-		if candidate.Name == payload.Name {
+		if candidate.ID == payload.ID {
 			if slices.Contains(candidate.Votes, user.ID) {
 				sender.ReportError(
-					fmt.Errorf("Already voted for %s", candidate.Name))
+					fmt.Errorf("Already voted for %s", candidate.ID))
 				return
 			}
 
@@ -264,10 +272,12 @@ type (
 	}
 
 	listItem struct {
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	}
 
 	candidate struct {
+		ID          string `json:"id"`
 		Name        string `json:"name"`
 		SuggestedBy string `json:"suggestedBy"`
 	}
@@ -380,7 +390,7 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 
 	for i, v := range room.Lists[user.ID] {
 		list[i] = listItem{
-			Name: v.Name,
+			Name: v.Title,
 		}
 	}
 
@@ -477,7 +487,8 @@ func NewEventListChanged(list []ListItem) EventListChanged {
 	eventList := make([]listItem, len(list))
 	for i, v := range list {
 		eventList[i] = listItem{
-			Name: v.Name,
+			ID:   v.ID,
+			Name: v.Title,
 		}
 	}
 
@@ -493,11 +504,13 @@ func collectCandidates(room *Room) []Candidate {
 	for id, list := range room.Lists {
 		for _, item := range list {
 			if !slices.ContainsFunc(c, func(v Candidate) bool {
-				return v.Name == item.Name
+				return v.ID == item.ID
 			}) {
 				c = append(c, Candidate{
-					Name:        item.Name,
+					ListItem:    item,
 					SuggestedBy: id,
+					Score:       0,
+					Votes:       []string{},
 				})
 			}
 		}
@@ -510,7 +523,8 @@ func transformCandidates(candidates []Candidate) []candidate {
 	c := make([]candidate, len(candidates))
 	for i, v := range candidates {
 		c[i] = candidate{
-			Name:        v.Name,
+			ID:          v.ID,
+			Name:        v.Title,
 			SuggestedBy: v.SuggestedBy,
 		}
 	}
@@ -544,7 +558,7 @@ func collectResults(room *Room) []resultsEntry {
 	var results []resultsEntry
 	for _, candidate := range room.Candidates {
 		results = append(results, resultsEntry{
-			Name:  candidate.Name,
+			Name:  candidate.Title,
 			Score: candidate.Score,
 		})
 	}

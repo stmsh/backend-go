@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -28,6 +29,12 @@ var jsonSerializer = &JsonSerializer{}
 
 func main() {
 	r := chi.NewRouter()
+	err := godotenv.Load(".env.local", ".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	r.Get("/search", HandleMovieQuery)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := r.Cookie("name")

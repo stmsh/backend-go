@@ -41,17 +41,12 @@ func HandleMovieQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error reading response body: %v", err), http.StatusInternalServerError)
-		return
-	}
-
 	for key, values := range resp.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
 	}
+
 	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
+	io.Copy(w, resp.Body)
 }

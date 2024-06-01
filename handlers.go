@@ -191,8 +191,17 @@ func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender.ID]
 
+	newItemID := strconv.Itoa(payload.ID)
+
+	if slices.ContainsFunc(room.Lists[user.ID], func(item ListItem) bool {
+		return item.ID == newItemID
+	}) {
+		sender.ReportError(fmt.Errorf("Item already in the list"))
+		return
+	}
+
 	listItem := ListItem{
-		ID:         strconv.Itoa(payload.ID),
+		ID:         newItemID,
 		Title:      payload.Title,
 		Overview:   payload.Overview,
 		Rating:     payload.Rating,
@@ -258,7 +267,7 @@ func HandleVote(sender *client.Client, msg client.MessageIncoming) {
 	if len(event.CandidatesLeft) == 0 {
 		user.Ready = true
 		sender.Send(NewPlayerUpdatedEvent(user, room))
-		sender.Send(NewEventPlayersChanged(room))
+		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
 	}
 	sender.Send(NewEventVoteRegistered(user, room))
 }

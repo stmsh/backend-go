@@ -1,8 +1,11 @@
+{{ block "room" . }}
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Room {{.ID}}</title>
+
+        <link rel="stylesheet" href="/public/output.css" />
 
         <script
             src="https://unpkg.com/htmx.org@1.9.12"
@@ -10,20 +13,20 @@
             crossorigin="anonymous"
         ></script>
         <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"></script>
-    </head>
-    <body>
-        <h1>#{{.ID}}</h1>
 
+        <script src="/public/js/search.js"></script>
+    </head>
+
+    <body class="w-[768px] h-dvh overflow-hidden m-auto flex flex-col">
         <div id="time"></div>
 
-        <div>
+        <div class="flex justify-between">
             <div id="players"></div>
             <div id="user"></div>
         </div>
 
-        <main>
+        <main class="flex flex-col grow overflow-hidden">
             <div id="stage"></div>
-
             <div id="actions"></div>
         </main>
     </body>
@@ -55,50 +58,21 @@
         }
     </script>
 </html>
-<!---->
-
-{{ define "user" }}
-<div id="user">{{ .Name }} {{ if .IsHost }}(Host){{ end }}</div>
 {{ end }}
 <!---->
 
 {{ define "players" }}
-<div id="players">
-    <button popovertarget="players__expanded">
-        ✓ {{ .Ready }}/{{ .Total }}
-    </button>
-
-    <ul popover id="players__expanded">
-        {{ range .Players }}
-        <li>
-            {{ if .Ready }} ✓ {{ end }} {{ .Name }} {{ if .IsHost }}(Host){{ end
-            }}
-        </li>
-        {{ end }}
-    </ul>
-</div>
+<div id="players">✓ {{ .Ready }}/{{ .Total }}</div>
 {{ end }}
 <!---->
 
+<!---->
+
 {{ define "actions" }}
-<div id="actions">
-    <label>
-        <input
-            type="checkbox"
-            {{if
-            .Ready}}checked{{end}}
-            ws-send
-            hx-vals='js:{"type":"ready", "payload": {"ready": event.target.checked }}'
-        />
-        Ready
-    </label>
-
-    {{ if .IsHost }}
-    <button ws-send hx-vals='js:{"type":"next_stage"}'>Next</button>
-
-    {{ template "timer" . }}
+<div id="actions" class="flex justify-between">
+    {{ template "action_ready" . }}
     <!---->
-    {{ end }}
+    {{ if .IsHost }} {{ template "action_next" . }} {{ end }}
 </div>
 {{ end }}
 <!---->
@@ -130,55 +104,22 @@
 {{ end }}
 <!---->
 
-{{ define "search" }}
-<form id="search">
-    <input type="text" name="query" />
-    <ul id="search_results"></ul>
-    <button type="submit">Search</button>
-
-    <script>
-        const $form = document.getElementById("search");
-        const $results = document.getElementById("search_results");
-
-        function updateResults(results) {
-            $results.replaceChildren(
-                ...results.map((r) => {
-                    const $li = document.createElement("li");
-                    $li.textContent = r.title;
-                    $li.setAttribute("ws-send", true);
-                    $li.setAttribute("hx-trigger", "click");
-                    $li.setAttribute(
-                        "hx-vals",
-                        JSON.stringify({
-                            type: "list_add",
-                            payload: r,
-                        })
-                    );
-                    return $li;
-                })
-            );
-            htmx.process($results);
-        }
-
-        function handleSubmit(e) {
-            e.preventDefault();
-            data = new FormData(e.target);
-            fetch("/search?query=" + data.get("query"))
-                .then((r) => r.json())
-                .then((r) => updateResults(r.results));
-        }
-
-        $form.addEventListener("submit", handleSubmit);
-    </script>
-</form>
-{{ end }}
-<!---->
-
 {{ define "list" }}
-<ul id="list">
+<ul id="list" class="h-full overflow-x-auto">
     {{ range . }}
     <li>
-        <span>{{ .Name }}</span>
+        <div class="flex gap-2">
+            <img
+                src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
+                alt="Poster to {{ .Title }}"
+                class="h-[200px]"
+            />
+            <div>
+                <p class="font-bold">{{ .Title }}</p>
+                <p>{{ .ReleaseDate.Year }}</p>
+            </div>
+        </div>
+
         <button
             ws-send
             hx-vals='js:{"type": "list_remove", "payload": { "id": "{{ .ID }}" }}'
@@ -192,8 +133,8 @@
 <!---->
 
 {{ define "stage_lobby" }}
-<div id="stage">
-    {{ template "search" }}
+<div id="stage" class="flex grow flex-col overflow-hidden">
+    <movie-search></movie-search>
     <!---->
     {{ template "list" .List }}
 </div>

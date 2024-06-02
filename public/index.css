@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: "Virgil";
+    src: url("https://excalidraw.com/Virgil.woff2");
+}
+
+html {
+    font-size: clamp(32px, 4vw, 48px);
+    font-family: "Virgil", serif;
+}

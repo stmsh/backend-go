@@ -205,9 +205,10 @@ func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 		Title:      payload.Title,
 		Overview:   payload.Overview,
 		Rating:     payload.Rating,
-		Year:       0,
 		PosterPath: payload.PosterPath,
 	}
+	listItem.ReleaseDate, _ = time.Parse("2006-01-02", payload.ReleaseDate)
+
 	room.Lists[user.ID] = append(room.Lists[user.ID], listItem)
 
 	listChanged := NewEventListChanged(room.Lists[user.ID])
@@ -281,8 +282,12 @@ type (
 	}
 
 	listItem struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID          string    `json:"id"`
+		Title       string    `json:"title"`
+		Overview    string    `json:"overview"`
+		Rating      float32   `json:"rating"`
+		ReleaseDate time.Time `json:"release_date"`
+		PosterPath  string    `json:"poster_path"`
 	}
 
 	candidate struct {
@@ -295,6 +300,7 @@ type (
 type (
 	EventRoomInit struct {
 		Type       string         `json:"type"`
+		ID         string         `json:"id"`
 		User       player         `json:"user"`
 		Stage      RoomStage      `json:"stage"`
 		Time       time.Duration  `json:"time"`
@@ -399,12 +405,18 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 
 	for i, v := range room.Lists[user.ID] {
 		list[i] = listItem{
-			Name: v.Title,
+			ID:          v.ID,
+			Title:       v.Title,
+			Overview:    v.Overview,
+			Rating:      v.Rating,
+			ReleaseDate: v.ReleaseDate,
+			PosterPath:  v.PosterPath,
 		}
 	}
 
 	return EventRoomInit{
 		Type: EventTypeRoomInit,
+		ID:   room.ID,
 		User: player{
 			ID:     user.ID,
 			Name:   user.Name,
@@ -496,8 +508,12 @@ func NewEventListChanged(list []ListItem) EventListChanged {
 	eventList := make([]listItem, len(list))
 	for i, v := range list {
 		eventList[i] = listItem{
-			ID:   v.ID,
-			Name: v.Title,
+			ID:          v.ID,
+			Title:       v.Title,
+			Overview:    v.Overview,
+			Rating:      v.Rating,
+			ReleaseDate: v.ReleaseDate,
+			PosterPath:  v.PosterPath,
 		}
 	}
 

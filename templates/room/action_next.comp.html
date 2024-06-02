@@ -1,0 +1,36 @@
+{{ define "action_next" }}
+<button
+    id="action_ready"
+    ws-send
+    hx-vals='js:{"type":"next_stage"}'
+    class="flex items-baseline text-blue-400"
+>
+    <span>Next</span>&nbsp;
+    <svg
+        height="0.5lh"
+        viewBox="0 0 12.7 10.583336"
+        version="1.1"
+        id="svg1"
+        xmlns="http://www.w3.org/2000/svg"
+        xmlns:svg="http://www.w3.org/2000/svg"
+    >
+        <g id="layer1" transform="translate(-0.02116321,-0.02230248)">
+            <path
+                style="
+                    fill: none;
+                    fill-opacity: 1;
+                    stroke: currentColor;
+                    stroke-width: 1.51527;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                    stroke-dasharray: none;
+                    stroke-opacity: 1;
+                    paint-order: normal;
+                "
+                d="M 3.9537982,9.8479976 8.7885587,5.3403571 4.2394481,0.77993747"
+                id="path13"
+            />
+        </g>
+    </svg>
+</button>
+{{ end }}

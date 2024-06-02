@@ -30,12 +30,12 @@ const (
 )
 
 type ListItem struct {
-	ID         string
-	Title      string
-	Overview   string
-	Rating     float32
-	Year       int
-	PosterPath string
+	ID          string
+	Title       string
+	Overview    string
+	Rating      float32
+	ReleaseDate time.Time
+	PosterPath  string
 }
 
 type Candidate struct {

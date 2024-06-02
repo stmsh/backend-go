@@ -34,6 +34,9 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	fs := http.FileServer(http.Dir("./public"))
+	r.Handle("/public/*", http.StripPrefix("/public/", fs))
+
 	r.Get("/search", HandleMovieQuery)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +87,7 @@ func main() {
 			return
 		}
 
-		w.Write(Render("room.html", room))
+		w.Write(Render("room", room))
 	})
 
 	manager := client.NewConnectionManager(HandleLeave)

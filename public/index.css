@@ -8,6 +8,6 @@
 }
 
 html {
-    font-size: clamp(32px, 4vw, 48px);
+    font-size: "24px";
     font-family: "Virgil", serif;
 }

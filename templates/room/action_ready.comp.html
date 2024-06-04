@@ -3,7 +3,7 @@
     id="action_ready"
     ws-send
     hx-vals='js:{"type":"ready", "payload": {"ready": {{ if .Ready }}false{{else}}true{{end}} }}'
-    class="{{if .Ready}}text-green-400{{else}}text-red-400{{end}} flex items-baseline"
+    class="{{if .Ready}}text-green-400{{else}}text-red-400{{end}} flex items-baseline p-3"
 >
     {{ if .Ready }}
     <svg

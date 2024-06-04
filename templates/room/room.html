@@ -15,9 +15,10 @@
         <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"></script>
 
         <script src="/public/js/search.js"></script>
+        <script src="/public/js/swipe-deck.js"></script>
     </head>
 
-    <body class="w-[768px] h-dvh overflow-hidden m-auto flex flex-col">
+    <body class="max-w-[768px] h-dvh m-auto flex flex-col overflow-hidden">
         <div id="time"></div>
 
         <div class="flex justify-between">
@@ -25,7 +26,7 @@
             <div id="user"></div>
         </div>
 
-        <main class="flex flex-col grow overflow-hidden">
+        <main class="flex flex-col grow min-h-0">
             <div id="stage"></div>
             <div id="actions"></div>
         </main>
@@ -133,7 +134,7 @@
 <!---->
 
 {{ define "stage_lobby" }}
-<div id="stage" class="flex grow flex-col overflow-hidden">
+<div id="stage" class="flex grow flex-col min-h-0">
     <movie-search></movie-search>
     <!---->
     {{ template "list" .List }}
@@ -142,38 +143,51 @@
 <!---->
 
 {{ define "candidates" }}
-<ul id="candidates">
-    {{ range . }}
-    <li>
-        <span> {{ .Name }} (Suggested by {{ .SuggestedBy }}) </span>
-        <button
-            ws-send
-            hx-vals='js:{"type": "vote", "payload": { "id": "{{ .ID }}", "vote": true }}'
+<div id="candidates" class="grow relative">
+    <swipe-deck
+        ws-send
+        hx-trigger="swipe"
+        hx-vals='
+            js:{
+                "type": "vote",
+                "payload": {
+                    "id": event.detail.target.dataset.id,
+                    "vote": event.detail.direction == "right"  
+                }
+            }'
+        swipe-distance="150"
+    >
+        {{ range . }}
+        <div
+            data-id="{{ .ID }}"
+            class="flex flex-col w-full gap-2 p-2 border-4 rounded-xl absolute top-0 bottom-0 bg-white overflow-hidden"
         >
-            +1
-        </button>
-        <button
-            ws-send
-            hx-vals='js:{"type": "vote", "payload": { "id": "{{ .ID }}", "vote": false }}'
-        >
-            -1
-        </button>
-    </li>
-    {{ end }}
-</ul>
+            <img
+                src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
+                alt="Poster to {{ .Title }}"
+                class="pointer-events-none w-full mx-auto"
+            />
+            <div>
+                <p class="font-bold">{{ .Title }}</p>
+                <p>{{ .ReleaseDate.Year }}</p>
+                <p class="overflow-hidden line-clamp-3 text-ellipsis text-sm">{{ .Overview }}</p>
+            </div>
+        </div>
+        {{ end }}
+    </swipe-deck>
+</div>
 {{ end }}
 <!---->
 
 {{ define "stage_voting" }}
-<div id="stage">
+<div id="stage" class="flex grow flex-col min-h-0">
     {{ template "candidates" .Candidates }}
-    <!---->
 </div>
 {{ end }}
 <!---->
 
 {{ define "stage_results" }}
-<div id="stage">
+<div id="stage" class="flex grow flex-col min-h-0">
     <ul>
         {{ range .Results }}
         <li>

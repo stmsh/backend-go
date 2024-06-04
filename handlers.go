@@ -154,6 +154,14 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 
 	room.Stage = RoomStage(nextStageMap[string(room.Stage)])
 
+	// Currently need to emit player updated event to update actions
+	// Think of different strategy for updating actions
+	for _, p := range room.Players {
+		p.Ready = false
+		sender.Send(NewPlayerUpdatedEvent(user, room))
+	}
+	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
+
 	switch room.Stage {
 	case StageVoting:
 		room.Candidates = collectCandidates(room)
@@ -291,8 +299,7 @@ type (
 	}
 
 	candidate struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
+		listItem
 		SuggestedBy string `json:"suggestedBy"`
 	}
 )
@@ -507,14 +514,7 @@ func NewEventRoomTime(room *Room) EventRoomTime {
 func NewEventListChanged(list []ListItem) EventListChanged {
 	eventList := make([]listItem, len(list))
 	for i, v := range list {
-		eventList[i] = listItem{
-			ID:          v.ID,
-			Title:       v.Title,
-			Overview:    v.Overview,
-			Rating:      v.Rating,
-			ReleaseDate: v.ReleaseDate,
-			PosterPath:  v.PosterPath,
-		}
+		eventList[i] = listItem(v)
 	}
 
 	return EventListChanged{
@@ -548,8 +548,7 @@ func transformCandidates(candidates []Candidate) []candidate {
 	c := make([]candidate, len(candidates))
 	for i, v := range candidates {
 		c[i] = candidate{
-			ID:          v.ID,
-			Name:        v.Title,
+			listItem:    listItem(v.ListItem),
 			SuggestedBy: v.SuggestedBy,
 		}
 	}

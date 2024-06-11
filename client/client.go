@@ -201,6 +201,7 @@ func (m *ConnectionManager) handleMessage(client *Client, message MessageIncomin
 	handler, ok := m.handlers[message.Type]
 	if !ok {
 		log.Printf("Unhandled message type %q", message.Type)
+		return
 	}
 
 	handler(client, message)

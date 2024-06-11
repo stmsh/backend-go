@@ -67,6 +67,9 @@ class Search extends HTMLElement {
 
     updateIndex(delta) {
         const n = this.results.childElementCount;
+        if (n === 0) {
+            return;
+        }
         this.index = (this.index + delta + n) % n;
     }
 
@@ -195,6 +198,7 @@ class Search extends HTMLElement {
     flex-col
     min-h-0
     bg-white
+    group-data-[expanded='true']:z-10
     group-data-[expanded='true']:fixed
     group-data-[expanded='true']:top-0
     group-data-[expanded='true']:bottom-0

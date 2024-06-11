@@ -14,6 +14,7 @@
         ></script>
         <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"></script>
 
+        <script src="/public/js/image.js"></script>
         <script src="/public/js/search.js"></script>
         <script src="/public/js/swipe-deck.js"></script>
     </head>
@@ -21,7 +22,7 @@
     <body class="max-w-[768px] h-dvh m-auto flex flex-col overflow-hidden">
         <div id="time"></div>
 
-        <div class="flex justify-between">
+        <div class="flex justify-between p-4">
             <div id="players"></div>
             <div id="user"></div>
         </div>
@@ -63,7 +64,26 @@
 <!---->
 
 {{ define "players" }}
-<div id="players">✓ {{ .Ready }}/{{ .Total }}</div>
+<details id="players" class="relative">
+    <summary class="cursor-pointer flex p-2 gap-2 select-none">
+        <span
+            class="inline-block w-[1rem] h-[1rem] bg-[url(/public/checkmark.svg)] bg-contain"
+        ></span>
+        <span>{{ .Ready }}/{{ .Total }}</span>
+    </summary>
+    <ul class="absolute bg-white p-2 border-4 rounded">
+        {{ range .Players }}
+        <li class="flex flex-nowrap gap-2">
+            {{ if .IsHost }}
+            <span>👑</span>
+            {{ else if .Ready }}
+            <span>✅</span>
+            {{ end }}
+            <span>{{ .Name }}</span>
+        </li>
+        {{ end }}
+    </ul>
+</details>
 {{ end }}
 <!---->
 
@@ -101,32 +121,40 @@
 <!---->
 
 {{ define "time" }}
-<div id="time">{{ format_duration . }}</div>
+<div id="time" class="w-full flex justify-center">
+    {{ if not eq .Seconds 0 }}
+    <span> {{ format_duration . }} </span>
+    {{ end }}
+</div>
 {{ end }}
 <!---->
 
 {{ define "list" }}
-<ul id="list" class="h-full overflow-x-auto">
+<ul id="list" class="flex-grow overflow-y-auto p-2">
     {{ range . }}
-    <li>
-        <div class="flex gap-2">
+    <li class="p-2">
+        <div class="flex gap-2 relative">
             <img
                 src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
                 alt="Poster to {{ .Title }}"
-                class="h-[200px]"
+                class="h-36 aspect-[2/3] object-contain"
+                onerror='this.onerror=null;this.src="/public/no_poster.svg"'
             />
+
             <div>
-                <p class="font-bold">{{ .Title }}</p>
+                <h2 class="text-2xl">{{ .Title }}</h2>
                 <p>{{ .ReleaseDate.Year }}</p>
+
+                <button
+                    ws-send
+                    hx-vals='js:{"type": "list_remove", "payload": { "id": "{{ .ID }}" }}'
+                    hx-on:click="event.target.remove()"
+                    class="absolute bottom-0 right-0 p-3"
+                >
+                    Remove
+                </button>
             </div>
         </div>
-
-        <button
-            ws-send
-            hx-vals='js:{"type": "list_remove", "payload": { "id": "{{ .ID }}" }}'
-        >
-            Remove
-        </button>
     </li>
     {{ end }}
 </ul>
@@ -160,17 +188,78 @@
         {{ range . }}
         <div
             data-id="{{ .ID }}"
-            class="flex flex-col w-full gap-2 p-2 border-4 rounded-xl absolute top-0 bottom-0 bg-white overflow-hidden"
+            class="flex flex-col w-full shadow-lg rounded-xl absolute top-0 bottom-0 bg-white"
         >
             <img
-                src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
+                src="https://image.tmdb.org/t/p/original/{{ .PosterPath }}"
                 alt="Poster to {{ .Title }}"
-                class="pointer-events-none w-full mx-auto"
+                class="pointer-events-none w-full mx-auto aspect-[2/3] rounded-t-xl object-cover min-h-[60%] max-h-[80%]"
+                onerror="this.onerror=null;this.src='/public/no_poster.svg'"
             />
-            <div>
-                <p class="font-bold">{{ .Title }}</p>
-                <p>{{ .ReleaseDate.Year }}</p>
-                <p class="overflow-hidden line-clamp-3 text-ellipsis text-sm">{{ .Overview }}</p>
+            <div
+                class="flex flex-col grow justify-between w-full p-2 rounded-b-[inherit]"
+            >
+                <div>
+                    <h2 class="text-2xl">{{ .Title }}</h2>
+                    <p>{{ .ReleaseDate.Year }}</p>
+                    <p class="text-ellipsis line-clamp-2">{{ .Overview }}</p>
+                </div>
+
+                <a
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    href="https://www.themoviedb.org/movie/{{.ID}}"
+                    class="p-2 flex items-baseline justify-end gap-2 text-sm text-blue-500 hover:underline"
+                >
+                    View on TMDB
+                    <span>
+                        <svg
+                            height="0.75lh"
+                            viewBox="0 0 32 32"
+                            version="1.1"
+                            id="svg1"
+                            xmlns="http://www.w3.org/2000/svg"
+                            xmlns:svg="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                style="
+                                    fill: none;
+                                    stroke: currentColor;
+                                    stroke-width: 4;
+                                    stroke-linecap: round;
+                                    stroke-linejoin: round;
+                                    stroke-dasharray: none;
+                                "
+                                d="M 15.895145,8.473786 2,8.497244 V 30 h 21.526213 l -2.8e-5,-13.895146"
+                                id="path7"
+                            />
+                            <path
+                                style="
+                                    fill: none;
+                                    stroke: currentColor;
+                                    stroke-width: 4;
+                                    stroke-linecap: round;
+                                    stroke-linejoin: round;
+                                    stroke-dasharray: none;
+                                "
+                                d="M 20.1357,2 H 30 v 9.8643"
+                                id="path9"
+                            />
+                            <path
+                                style="
+                                    fill: none;
+                                    stroke: currentColor;
+                                    stroke-width: 4;
+                                    stroke-linecap: round;
+                                    stroke-linejoin: round;
+                                    stroke-dasharray: none;
+                                "
+                                d="M 19.0625,12.9375 30,2"
+                                id="path10"
+                            />
+                        </svg>
+                    </span>
+                </a>
             </div>
         </div>
         {{ end }}
@@ -180,7 +269,7 @@
 <!---->
 
 {{ define "stage_voting" }}
-<div id="stage" class="flex grow flex-col min-h-0">
+<div id="stage" class="flex grow flex-col min-h-0 p-4">
     {{ template "candidates" .Candidates }}
 </div>
 {{ end }}

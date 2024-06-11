@@ -484,7 +484,6 @@ func NewPlayerUpdatedEvent(p *Player, room *Room) EventPlayerUpdated {
 }
 
 func NewHostChangedEvent(room *Room) EventHostChanged {
-
 	return EventHostChanged{
 		ID:   room.Host.ID,
 		Name: room.Host.Name,

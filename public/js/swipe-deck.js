@@ -140,6 +140,10 @@ function clamp(min, v, max) {
 
 const styles = document.createElement("style");
 styles.innerHTML = `
+swipe-deck > *:last-child {
+    will-change: transform;
+}
+
 .swipe_deck__item {
     --swipe-deck-dx: 0px;
     --swipe-deck-angle: 0deg;

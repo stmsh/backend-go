@@ -190,6 +190,7 @@
                     "vote": event.detail.direction == "right"  
                 }
             }'
+        hx-on:swipe="event.detail.target.remove()"
         swipe-distance="150"
     >
         {{ range . }}
@@ -216,56 +217,9 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     href="https://www.themoviedb.org/movie/{{.ID}}"
-                    class="p-2 flex items-baseline justify-end gap-2 text-sm text-blue-500 hover:underline"
+                    class="p-2 flex justify-end text-sm text-blue-500 hover:underline"
                 >
                     View on TMDB
-                    <span>
-                        <svg
-                            height="0.75lh"
-                            viewBox="0 0 32 32"
-                            version="1.1"
-                            id="svg1"
-                            xmlns="http://www.w3.org/2000/svg"
-                            xmlns:svg="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                style="
-                                    fill: none;
-                                    stroke: currentColor;
-                                    stroke-width: 4;
-                                    stroke-linecap: round;
-                                    stroke-linejoin: round;
-                                    stroke-dasharray: none;
-                                "
-                                d="M 15.895145,8.473786 2,8.497244 V 30 h 21.526213 l -2.8e-5,-13.895146"
-                                id="path7"
-                            />
-                            <path
-                                style="
-                                    fill: none;
-                                    stroke: currentColor;
-                                    stroke-width: 4;
-                                    stroke-linecap: round;
-                                    stroke-linejoin: round;
-                                    stroke-dasharray: none;
-                                "
-                                d="M 20.1357,2 H 30 v 9.8643"
-                                id="path9"
-                            />
-                            <path
-                                style="
-                                    fill: none;
-                                    stroke: currentColor;
-                                    stroke-width: 4;
-                                    stroke-linecap: round;
-                                    stroke-linejoin: round;
-                                    stroke-dasharray: none;
-                                "
-                                d="M 19.0625,12.9375 30,2"
-                                id="path10"
-                            />
-                        </svg>
-                    </span>
                 </a>
             </div>
         </div>

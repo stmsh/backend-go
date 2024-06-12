@@ -124,7 +124,7 @@
 
 {{ define "time" }}
 <div id="time" class="w-full flex justify-center">
-    {{ if not (eq .Seconds 0) }}
+    {{ if not (eq .Seconds 0.0) }}
     <span> {{ format_duration . }} </span>
     {{ end }}
 </div>

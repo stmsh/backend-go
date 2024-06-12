@@ -29,6 +29,8 @@ var htmxSerializer = &HtmxSerializer{}
 var jsonSerializer = &JsonSerializer{}
 
 func main() {
+	roomsRepository := NewInMemoryRoomsRepository()
+
 	r := chi.NewRouter()
 	err := godotenv.Load(".env.local", ".env")
 	if err != nil {
@@ -64,7 +66,7 @@ func main() {
 
 	r.Post("/create", func(w http.ResponseWriter, r *http.Request) {
 		newRoom := NewRoom()
-		rooms[newRoom.ID] = newRoom
+		roomsRepository.Add(newRoom)
 
 		w.Header().Add("HX-Redirect", fmt.Sprintf("/room/%s", newRoom.ID))
 	})
@@ -72,8 +74,8 @@ func main() {
 	r.Get("/room/{id}", func(w http.ResponseWriter, r *http.Request) {
 		roomID := r.PathValue("id")
 
-		room, ok := rooms[roomID]
-		if !ok {
+		room := roomsRepository.Find(roomID)
+		if room == nil {
 			w.Write(Render("404.html", nil))
 			return
 		}
@@ -81,7 +83,9 @@ func main() {
 		w.Write(Render("room", room))
 	})
 
-	manager := client.NewConnectionManager(HandleLeave)
+	handlers := NewHandlers(roomsRepository)
+
+	manager := client.NewConnectionManager(handlers.HandleLeave)
 	EnsureRoom := func(handler client.EventHandler) client.EventHandler {
 		return func(c *client.Client, m client.MessageIncoming) {
 			if c.RoomID == "" {
@@ -92,13 +96,13 @@ func main() {
 			handler(c, m)
 		}
 	}
-	manager.RegisterEventHandler(MessageTypeJoin, HandleJoin)
-	manager.RegisterEventHandler(MessageTypeUserToggleReady, EnsureRoom(HandleToggleReady))
-	manager.RegisterEventHandler(MessageTypeNextStage, EnsureRoom(HandleChangeStage))
-	manager.RegisterEventHandler(MessageTypeSetTimer, EnsureRoom(HandleSetTimer))
-	manager.RegisterEventHandler(MessageTypeListAdd, EnsureRoom(HandleListAdd))
-	manager.RegisterEventHandler(MessageTypeListRemove, EnsureRoom(HandleListRemove))
-	manager.RegisterEventHandler(MessageTypeVote, EnsureRoom(HandleVote))
+	manager.RegisterEventHandler(MessageTypeJoin, handlers.HandleJoin)
+	manager.RegisterEventHandler(MessageTypeUserToggleReady, EnsureRoom(handlers.HandleToggleReady))
+	manager.RegisterEventHandler(MessageTypeNextStage, EnsureRoom(handlers.HandleChangeStage))
+	manager.RegisterEventHandler(MessageTypeSetTimer, EnsureRoom(handlers.HandleSetTimer))
+	manager.RegisterEventHandler(MessageTypeListAdd, EnsureRoom(handlers.HandleListAdd))
+	manager.RegisterEventHandler(MessageTypeListRemove, EnsureRoom(handlers.HandleListRemove))
+	manager.RegisterEventHandler(MessageTypeVote, EnsureRoom(handlers.HandleVote))
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -121,8 +125,8 @@ func main() {
 		go client.ReadMessages()
 	})
 
-	go RunRoomTimer(manager)
-	go RunRoomCleanup()
+	go roomsRepository.RunRoomTimer(manager)
+	go roomsRepository.RunRoomCleanup()
 
 	http.ListenAndServe(":8080", r)
 }

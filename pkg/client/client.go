@@ -82,6 +82,7 @@ func (c *Client) WriteMessages() {
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			err := c.conn.WriteMessage(websocket.PingMessage, nil)
 			if err != nil {
+				log.Printf("in WriteMessages. Failed to write ping message: %s", err.Error())
 				return
 			}
 		}

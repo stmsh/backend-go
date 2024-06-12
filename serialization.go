@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/gorilla/websocket"
 
@@ -67,9 +66,6 @@ func (s *HtmxSerializer) Serialize(message client.MessageOutgoing) (messageType 
 	case EventStageResults:
 		serialized = append(serialized, Render("actions_results", nil))
 		serialized = append(serialized, Render("stage_results", event))
-
-	default:
-		log.Printf("In HtmxSerializer.Serialize. Unrecognized event: %v", event)
 	}
 
 	return

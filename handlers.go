@@ -52,253 +52,278 @@ const (
 	MessageTypeVote            = "vote"
 )
 
-func HandleJoin(sender *client.Client, msg client.MessageIncoming) {
+type Handlers struct {
+	rooms RoomsRepository
+}
+
+func NewHandlers(repo RoomsRepository) *Handlers {
+	return &Handlers{
+		rooms: repo,
+	}
+}
+
+func (h *Handlers) HandleJoin(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageJoin
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
 		return
 	}
 
-	room, ok := rooms[payload.RoomID]
-	if !ok {
-		sender.ReportError(fmt.Errorf("Room doesn't exist"))
+	err := h.rooms.Update(payload.RoomID, func(r *Room) (*Room, error) {
+		sender.Manager.AssignRoom(sender, payload.RoomID)
+
+		newPlayer := Player{
+			ID:   sender.ID,
+			Name: payload.Name,
+		}
+
+		if len(r.Players) == 0 {
+			r.HostID = newPlayer.ID
+		}
+		r.Players[sender.ID] = newPlayer
+
+		sender.Send(NewEventRoomInit(newPlayer, *r))
+		playerJoined := NewEventPlayerJoined(newPlayer)
+		playersChanged := NewEventPlayersChanged(*r)
+		sender.Manager.BroadcastFunc(r.ID, func(c *client.Client) {
+			if c != sender {
+				c.Send(playerJoined)
+			}
+			c.Send(playersChanged)
+		})
+
+		return r, nil
+	})
+
+	if err != nil {
+		sender.ReportError(err)
 		return
 	}
-	sender.Manager.AssignRoom(sender, payload.RoomID)
-
-	newPlayer := Player{
-		ID:   sender.ID,
-		Name: payload.Name,
-	}
-
-	if len(room.Players) == 0 {
-		room.HostID = newPlayer.ID
-	}
-	room.Players[sender.ID] = newPlayer
-
-	rooms[payload.RoomID] = room
-
-	sender.Send(NewEventRoomInit(newPlayer, room))
-
-	playerJoined := NewEventPlayerJoined(newPlayer)
-	playersChanged := NewEventPlayersChanged(room)
-	sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
-		if c != sender {
-			c.Send(playerJoined)
-		}
-		c.Send(playersChanged)
-	})
 }
 
-func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageUserToggleReady
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
 		return
 	}
 
-	room := rooms[sender.RoomID]
-	p := room.Players[sender.ID]
-	p.Ready = payload.Ready
-	room.Players[sender.ID] = p
+	h.rooms.Update(sender.RoomID, func(r *Room) (*Room, error) {
+		p := r.Players[sender.ID]
+		p.Ready = payload.Ready
+		r.Players[sender.ID] = p
 
-	rooms[sender.RoomID] = room
+		sender.Send(NewPlayerUpdatedEvent(p, *r))
+		sender.Manager.Broadcast(r.ID, NewEventPlayersChanged(*r))
 
-	sender.Send(NewPlayerUpdatedEvent(p, room))
-	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
+		return r, nil
+	})
 }
 
-func HandleLeave(sender *client.Client) {
-	room, ok := rooms[sender.RoomID]
-	if !ok {
-		return
-	}
-	delete(room.Players, sender.ID)
+func (h *Handlers) HandleLeave(sender *client.Client) {
+	h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		delete(room.Players, sender.ID)
 
-	if room.HostID == sender.ID {
-		var nextHostID string
-		for _, p := range room.Players {
-			nextHostID = p.ID
-			break
+		if room.HostID == sender.ID {
+			var nextHostID string
+			for _, p := range room.Players {
+				nextHostID = p.ID
+				break
+			}
+
+			room.HostID = nextHostID
+
+			if room.HostID != "" {
+				hostChanged := NewHostChangedEvent(room.Players[room.HostID])
+				sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
+					c.Send(hostChanged)
+					// notify new host that its data changed
+					if c.ID == room.HostID {
+						c.Send(NewPlayerUpdatedEvent(room.Players[c.ID], *room))
+					}
+				})
+			}
 		}
 
-		room.HostID = nextHostID
+		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(*room))
 
-		if room.HostID != "" {
-			hostChanged := NewHostChangedEvent(room.Players[room.HostID])
-			sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
-				c.Send(hostChanged)
-				// notify new host that its data changed
-				if c.ID == room.HostID {
-					c.Send(NewPlayerUpdatedEvent(room.Players[c.ID], room))
-				}
-			})
+		if len(room.Players) == 0 {
+			room.ScheduledForDeletion = true
 		}
-	}
 
-	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
-
-	if len(room.Players) == 0 {
-		room.ScheduledForDeletion = true
-	}
-
-	rooms[sender.RoomID] = room
+		return room, nil
+	})
 }
 
-func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
-	room := rooms[sender.RoomID]
-	user := room.Players[sender.ID]
-	if user.ID != room.HostID {
-		sender.ReportError(fmt.Errorf("Only host can change stage"))
-		return
-	}
-
-	if room.Stage == StageResults {
-		sender.ReportError(
-			fmt.Errorf("Can't change stage. Final stage reached"))
-		return
-	}
-
-	room.Stage = RoomStage(nextStageMap[string(room.Stage)])
-
-	switch room.Stage {
-	case StageVoting:
-		// Currently need to emit player updated event to update actions
-		// Think of different strategy for updating actions
-		for _, p := range room.Players {
-			p.Ready = false
-			room.Players[p.ID] = p
-			sender.Send(NewPlayerUpdatedEvent(user, room))
+func (h *Handlers) HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		user := room.Players[sender.ID]
+		if user.ID != room.HostID {
+			return nil, fmt.Errorf("Only host can change stage")
 		}
-		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
 
-		room.Candidates = collectCandidates(room)
-		sender.Manager.Broadcast(room.ID, NewEventStageVoting(room))
+		if room.Stage == StageResults {
+			return nil, fmt.Errorf("Can't change stage. Final stage reached")
+		}
 
-	case StageResults:
-		sender.Manager.Broadcast(room.ID, NewEventStageResults(room))
-	}
+		room.Stage = RoomStage(nextStageMap[string(room.Stage)])
 
-	rooms[sender.RoomID] = room
-}
+		switch room.Stage {
+		case StageVoting:
+			// Currently need to emit player updated event to update actions
+			// Think of different strategy for updating actions
+			for _, p := range room.Players {
+				p.Ready = false
+				room.Players[p.ID] = p
+				sender.Send(NewPlayerUpdatedEvent(user, *room))
+			}
+			sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(*room))
 
-func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
-	room := rooms[sender.RoomID]
-	user := room.Players[sender.ID]
-	if user.ID != room.HostID {
-		sender.ReportError(fmt.Errorf("Only host can change stage"))
-		return
-	}
+			room.Candidates = collectCandidates(*room)
+			sender.Manager.Broadcast(room.ID, NewEventStageVoting(*room))
 
-	var payload MessageSetTimer
-	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		case StageResults:
+			sender.Manager.Broadcast(room.ID, NewEventStageResults(*room))
+		}
+
+		return room, nil
+	})
+
+	if err != nil {
 		sender.ReportError(err)
-		return
 	}
-
-	room.Time = time.Duration(payload.TimeInSeconds) * time.Second
-	sender.Manager.Broadcast(room.ID, NewTimerSetEvent(room))
-
-	rooms[sender.RoomID] = room
 }
 
-func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		user := room.Players[sender.ID]
+		if user.ID != room.HostID {
+			return nil, fmt.Errorf("Only host can change stage")
+		}
+
+		var payload MessageSetTimer
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			return nil, err
+		}
+
+		room.Time = time.Duration(payload.TimeInSeconds) * time.Second
+		sender.Manager.Broadcast(room.ID, NewTimerSetEvent(*room))
+
+		return room, nil
+	})
+
+	if err != nil {
+		sender.ReportError(err)
+	}
+}
+
+func (h *Handlers) HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageListAdd
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
 		return
 	}
 
-	room := rooms[sender.RoomID]
-	user := room.Players[sender.ID]
+	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		user := room.Players[sender.ID]
+		newItemID := strconv.Itoa(payload.ID)
 
-	newItemID := strconv.Itoa(payload.ID)
+		if slices.ContainsFunc(room.Lists[user.ID], func(item ListItem) bool {
+			return item.ID == newItemID
+		}) {
+			return nil, fmt.Errorf("Item already in the list")
+		}
 
-	if slices.ContainsFunc(room.Lists[user.ID], func(item ListItem) bool {
-		return item.ID == newItemID
-	}) {
-		sender.ReportError(fmt.Errorf("Item already in the list"))
-		return
+		listItem := ListItem{
+			ID:         newItemID,
+			Title:      payload.Title,
+			Overview:   payload.Overview,
+			Rating:     payload.Rating,
+			PosterPath: payload.PosterPath,
+		}
+		listItem.ReleaseDate, _ = time.Parse("2006-01-02", payload.ReleaseDate)
+
+		room.Lists[user.ID] = append(room.Lists[user.ID], listItem)
+
+		listChanged := NewEventListChanged(room.Lists[user.ID])
+		sender.Send(listChanged)
+
+		return room, nil
+	})
+
+	if err != nil {
+		sender.ReportError(err)
 	}
-
-	listItem := ListItem{
-		ID:         newItemID,
-		Title:      payload.Title,
-		Overview:   payload.Overview,
-		Rating:     payload.Rating,
-		PosterPath: payload.PosterPath,
-	}
-	listItem.ReleaseDate, _ = time.Parse("2006-01-02", payload.ReleaseDate)
-
-	room.Lists[user.ID] = append(room.Lists[user.ID], listItem)
-
-	listChanged := NewEventListChanged(room.Lists[user.ID])
-	sender.Send(listChanged)
-
-	rooms[sender.RoomID] = room
 }
 
-func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageListRemove
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
 		return
 	}
 
-	room := rooms[sender.RoomID]
-	user := room.Players[sender.ID]
+	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		user := room.Players[sender.ID]
 
-	updatedList := slices.DeleteFunc(room.Lists[user.ID], func(v ListItem) bool {
-		return v.ID == payload.ID
+		updatedList := slices.DeleteFunc(room.Lists[user.ID], func(v ListItem) bool {
+			return v.ID == payload.ID
+		})
+
+		room.Lists[user.ID] = updatedList
+		sender.Send(NewEventListChanged(updatedList))
+
+		return room, nil
 	})
 
-	room.Lists[user.ID] = updatedList
-	sender.Send(NewEventListChanged(updatedList))
-
-	rooms[sender.RoomID] = room
+	if err != nil {
+		sender.ReportError(err)
+	}
 }
 
-func HandleVote(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleVote(sender *client.Client, msg client.MessageIncoming) {
 	var payload MessageVote
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
 		return
 	}
 
-	room := rooms[sender.RoomID]
-	if room.Stage != StageVoting {
-		sender.ReportError(fmt.Errorf("Not in voting stage"))
-		return
-	}
+	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+		if room.Stage != StageVoting {
+			return nil, fmt.Errorf("Not in voting stage")
+		}
 
-	user := room.Players[sender.ID]
-	for i, candidate := range room.Candidates {
-		if candidate.ID == payload.ID {
-			if slices.Contains(candidate.Votes, user.ID) {
-				sender.ReportError(
-					fmt.Errorf("Already voted for %s", candidate.ID))
-				return
-			}
+		user := room.Players[sender.ID]
+		for i, candidate := range room.Candidates {
+			if candidate.ID == payload.ID {
+				if slices.Contains(candidate.Votes, user.ID) {
+					return nil, fmt.Errorf("Already voted for %s", candidate.ID)
+				}
 
-			room.Candidates[i].Votes = append(room.Candidates[i].Votes, user.ID)
-			if payload.Vote {
-				room.Candidates[i].Score++
-			} else {
-				room.Candidates[i].Score--
+				room.Candidates[i].Votes = append(room.Candidates[i].Votes, user.ID)
+				if payload.Vote {
+					room.Candidates[i].Score++
+				} else {
+					room.Candidates[i].Score--
+				}
 			}
 		}
-	}
 
-	event := NewEventVoteRegistered(user, room)
-	if len(event.CandidatesLeft) == 0 {
-		user.Ready = true
-		room.Players[user.ID] = user
-		sender.Send(NewPlayerUpdatedEvent(user, room))
-		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
-	}
-	sender.Send(NewEventVoteRegistered(user, room))
+		event := NewEventVoteRegistered(user, *room)
+		if len(event.CandidatesLeft) == 0 {
+			user.Ready = true
+			room.Players[user.ID] = user
+			sender.Send(NewPlayerUpdatedEvent(user, *room))
+			sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(*room))
+		}
+		sender.Send(NewEventVoteRegistered(user, *room))
 
-	rooms[sender.RoomID] = room
+		return room, nil
+	})
+
+	if err != nil {
+		sender.ReportError(err)
+	}
 }
 
 type (

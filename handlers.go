@@ -483,7 +483,7 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 		List:       list,
 		Stage:      room.Stage,
 		Players:    players,
-		Candidates: transformCandidates(room.Candidates),
+		Candidates: transformCandidates(collectRemainingCandidates(user, room)),
 		Winners:    winners,
 		Others:     others,
 	}
@@ -524,7 +524,6 @@ func NewEventPlayersChanged(room Room) EventPlayersChanged {
 }
 
 func NewPlayerUpdatedEvent(p Player, room Room) EventPlayerUpdated {
-
 	return EventPlayerUpdated{
 		Type:   EventTypePlayerUpdated,
 		ID:     p.ID,
@@ -613,18 +612,23 @@ func NewEventStageVoting(room Room) EventStageVoting {
 	}
 }
 
-func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
-	left := make([]Candidate, 0, len(room.Candidates))
+func collectRemainingCandidates(player Player, room Room) []Candidate {
+	remaining := make([]Candidate, 0, len(room.Candidates))
 	for _, c := range room.Candidates {
-		if slices.Contains(c.Votes, voter.ID) {
+		if slices.Contains(c.Votes, player.ID) {
 			continue
 		}
-		left = append(left, c)
+		remaining = append(remaining, c)
 	}
+
+	return remaining
+}
+
+func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
 
 	return EventVoteRegistered{
 		Type:           EventTypeVoteRegistered,
-		CandidatesLeft: transformCandidates(left),
+		CandidatesLeft: transformCandidates(collectRemainingCandidates(voter, room)),
 	}
 }
 

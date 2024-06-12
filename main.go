@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"stmsh/client"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
+
+	"stmsh/pkg/client"
 )
 
 const (

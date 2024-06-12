@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"stmsh/client"
 
 	"github.com/gorilla/websocket"
+
+	"stmsh/pkg/client"
 )
 
 type JsonSerializer struct{}

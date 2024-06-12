@@ -2,10 +2,11 @@ package main
 
 import (
 	"log"
-	"stmsh/client"
 	"time"
 
 	"github.com/google/uuid"
+
+	"stmsh/pkg/client"
 )
 
 type Player struct {
@@ -14,8 +15,8 @@ type Player struct {
 	Ready bool
 }
 
-func NewPlayer(name string) *Player {
-	return &Player{
+func NewPlayer(name string) Player {
+	return Player{
 		ID:   uuid.NewString(),
 		Name: name,
 	}
@@ -48,25 +49,25 @@ type Candidate struct {
 
 type Room struct {
 	ID                   string
-	Host                 *Player
+	HostID               string
 	Stage                RoomStage
 	Time                 time.Duration
 	ScheduledForDeletion bool
-	Players              map[string]*Player
+	Players              map[string]Player
 	Lists                map[string][]ListItem
 	Candidates           []Candidate
 }
 
-var rooms = make(map[string]*Room, 100)
+var rooms = make(map[string]Room, 100)
 
-func NewRoom() *Room {
-	return &Room{
-		ID:    uuid.NewString(),
-		Time:  0,
-		Stage: StageLobby,
-		Host:  nil,
+func NewRoom() Room {
+	return Room{
+		ID:     uuid.NewString(),
+		Time:   0,
+		Stage:  StageLobby,
+		HostID: "",
 
-		Players:    make(map[string]*Player),
+		Players:    make(map[string]Player),
 		Lists:      make(map[string][]ListItem),
 		Candidates: nil,
 	}

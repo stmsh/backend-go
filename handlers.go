@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"stmsh/client"
 	"strconv"
 	"time"
+
+	"stmsh/pkg/client"
 )
 
 type (
@@ -65,15 +66,17 @@ func HandleJoin(sender *client.Client, msg client.MessageIncoming) {
 	}
 	sender.Manager.AssignRoom(sender, payload.RoomID)
 
-	newPlayer := &Player{
+	newPlayer := Player{
 		ID:   sender.ID,
 		Name: payload.Name,
 	}
 
 	if len(room.Players) == 0 {
-		room.Host = newPlayer
+		room.HostID = newPlayer.ID
 	}
 	room.Players[sender.ID] = newPlayer
+
+	rooms[payload.RoomID] = room
 
 	sender.Send(NewEventRoomInit(newPlayer, room))
 
@@ -97,6 +100,9 @@ func HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	p := room.Players[sender.ID]
 	p.Ready = payload.Ready
+	room.Players[sender.ID] = p
+
+	rooms[sender.RoomID] = room
 
 	sender.Send(NewPlayerUpdatedEvent(p, room))
 	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
@@ -107,24 +113,23 @@ func HandleLeave(sender *client.Client) {
 	if !ok {
 		return
 	}
-	deletedUser := room.Players[sender.ID]
 	delete(room.Players, sender.ID)
 
-	if room.Host == deletedUser {
-		var nextHost *Player
+	if room.HostID == sender.ID {
+		var nextHostID string
 		for _, p := range room.Players {
-			nextHost = p
+			nextHostID = p.ID
 			break
 		}
 
-		room.Host = nextHost
+		room.HostID = nextHostID
 
-		if room.Host != nil {
-			hostChanged := NewHostChangedEvent(room)
+		if room.HostID != "" {
+			hostChanged := NewHostChangedEvent(room.Players[room.HostID])
 			sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
 				c.Send(hostChanged)
 				// notify new host that its data changed
-				if c.ID == room.Host.ID {
+				if c.ID == room.HostID {
 					c.Send(NewPlayerUpdatedEvent(room.Players[c.ID], room))
 				}
 			})
@@ -136,12 +141,14 @@ func HandleLeave(sender *client.Client) {
 	if len(room.Players) == 0 {
 		room.ScheduledForDeletion = true
 	}
+
+	rooms[sender.RoomID] = room
 }
 
 func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender.ID]
-	if user != room.Host {
+	if user.ID != room.HostID {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
 	}
@@ -160,6 +167,7 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 		// Think of different strategy for updating actions
 		for _, p := range room.Players {
 			p.Ready = false
+			room.Players[p.ID] = p
 			sender.Send(NewPlayerUpdatedEvent(user, room))
 		}
 		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
@@ -170,12 +178,14 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 	case StageResults:
 		sender.Manager.Broadcast(room.ID, NewEventStageResults(room))
 	}
+
+	rooms[sender.RoomID] = room
 }
 
 func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
 	room := rooms[sender.RoomID]
 	user := room.Players[sender.ID]
-	if user != room.Host {
+	if user.ID != room.HostID {
 		sender.ReportError(fmt.Errorf("Only host can change stage"))
 		return
 	}
@@ -188,6 +198,8 @@ func HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
 
 	room.Time = time.Duration(payload.TimeInSeconds) * time.Second
 	sender.Manager.Broadcast(room.ID, NewTimerSetEvent(room))
+
+	rooms[sender.RoomID] = room
 }
 
 func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
@@ -222,6 +234,8 @@ func HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
 
 	listChanged := NewEventListChanged(room.Lists[user.ID])
 	sender.Send(listChanged)
+
+	rooms[sender.RoomID] = room
 }
 
 func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
@@ -240,6 +254,8 @@ func HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
 
 	room.Lists[user.ID] = updatedList
 	sender.Send(NewEventListChanged(updatedList))
+
+	rooms[sender.RoomID] = room
 }
 
 func HandleVote(sender *client.Client, msg client.MessageIncoming) {
@@ -276,10 +292,13 @@ func HandleVote(sender *client.Client, msg client.MessageIncoming) {
 	event := NewEventVoteRegistered(user, room)
 	if len(event.CandidatesLeft) == 0 {
 		user.Ready = true
+		room.Players[user.ID] = user
 		sender.Send(NewPlayerUpdatedEvent(user, room))
 		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
 	}
 	sender.Send(NewEventVoteRegistered(user, room))
+
+	rooms[sender.RoomID] = room
 }
 
 type (
@@ -399,7 +418,7 @@ const (
 	EventTypeListChanged   = "player:list_changed"
 )
 
-func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
+func NewEventRoomInit(user Player, room Room) EventRoomInit {
 	players := make([]player, 0, len(room.Players))
 
 	for _, v := range room.Players {
@@ -407,7 +426,7 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 			ID:     v.ID,
 			Name:   v.Name,
 			Ready:  v.Ready,
-			IsHost: v == room.Host,
+			IsHost: v.ID == room.HostID,
 		})
 	}
 
@@ -433,7 +452,7 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 			ID:     user.ID,
 			Name:   user.Name,
 			Ready:  user.Ready,
-			IsHost: room.Host == user,
+			IsHost: room.HostID == user.ID,
 		},
 		Time:       room.Time,
 		List:       list,
@@ -445,7 +464,7 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 	}
 }
 
-func NewEventPlayerJoined(p *Player) EventPlayerJoined {
+func NewEventPlayerJoined(p Player) EventPlayerJoined {
 	return EventPlayerJoined{
 		Type: EventTypePlayerJoined,
 		ID:   p.ID,
@@ -453,7 +472,7 @@ func NewEventPlayerJoined(p *Player) EventPlayerJoined {
 	}
 }
 
-func NewEventPlayersChanged(room *Room) EventPlayersChanged {
+func NewEventPlayersChanged(room Room) EventPlayersChanged {
 	ready := 0
 	total := len(room.Players)
 	players := make([]player, 0, total)
@@ -467,7 +486,7 @@ func NewEventPlayersChanged(room *Room) EventPlayersChanged {
 			ID:     v.ID,
 			Name:   v.Name,
 			Ready:  v.Ready,
-			IsHost: v == room.Host,
+			IsHost: v.ID == room.HostID,
 		})
 	}
 
@@ -479,20 +498,21 @@ func NewEventPlayersChanged(room *Room) EventPlayersChanged {
 	}
 }
 
-func NewPlayerUpdatedEvent(p *Player, room *Room) EventPlayerUpdated {
+func NewPlayerUpdatedEvent(p Player, room Room) EventPlayerUpdated {
+
 	return EventPlayerUpdated{
 		Type:   EventTypePlayerUpdated,
 		ID:     p.ID,
 		Name:   p.Name,
 		Ready:  p.Ready,
-		IsHost: room.Host == p,
+		IsHost: p.ID == room.HostID,
 	}
 }
 
-func NewHostChangedEvent(room *Room) EventHostChanged {
+func NewHostChangedEvent(newHost Player) EventHostChanged {
 	return EventHostChanged{
-		ID:   room.Host.ID,
-		Name: room.Host.Name,
+		ID:   newHost.ID,
+		Name: newHost.Name,
 	}
 }
 
@@ -502,14 +522,14 @@ var nextStageMap = map[string]string{
 	StageResults: "",
 }
 
-func NewTimerSetEvent(room *Room) EventTimerSet {
+func NewTimerSetEvent(room Room) EventTimerSet {
 	return EventTimerSet{
 		Type: EventTypeTimerSet,
 		Time: room.Time,
 	}
 }
 
-func NewEventRoomTime(room *Room) EventRoomTime {
+func NewEventRoomTime(room Room) EventRoomTime {
 	return EventRoomTime{
 		Type: EventTypeRoomTime,
 		Time: room.Time,
@@ -528,7 +548,7 @@ func NewEventListChanged(list []ListItem) EventListChanged {
 	}
 }
 
-func collectCandidates(room *Room) []Candidate {
+func collectCandidates(room Room) []Candidate {
 	c := make([]Candidate, 0, 0)
 
 	for id, list := range room.Lists {
@@ -561,14 +581,14 @@ func transformCandidates(candidates []Candidate) []candidate {
 	return c
 }
 
-func NewEventStageVoting(room *Room) EventStageVoting {
+func NewEventStageVoting(room Room) EventStageVoting {
 	return EventStageVoting{
 		Type:       EventTypeStageVoting,
 		Candidates: transformCandidates(room.Candidates),
 	}
 }
 
-func NewEventVoteRegistered(voter *Player, room *Room) EventVoteRegistered {
+func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
 	left := make([]Candidate, 0, len(room.Candidates))
 	for _, c := range room.Candidates {
 		if slices.Contains(c.Votes, voter.ID) {
@@ -583,7 +603,7 @@ func NewEventVoteRegistered(voter *Player, room *Room) EventVoteRegistered {
 	}
 }
 
-func collectResults(room *Room) ([]resultsEntry, []resultsEntry) {
+func collectResults(room Room) ([]resultsEntry, []resultsEntry) {
 	results := make([]resultsEntry, len(room.Candidates))
 	for i, candidate := range room.Candidates {
 		results[i] = resultsEntry{
@@ -614,7 +634,7 @@ func collectResults(room *Room) ([]resultsEntry, []resultsEntry) {
 	return winners, others
 }
 
-func NewEventStageResults(room *Room) EventStageResults {
+func NewEventStageResults(room Room) EventStageResults {
 	winners, others := collectResults(room)
 
 	return EventStageResults{

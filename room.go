@@ -130,7 +130,7 @@ func (r *InMemoryRoomsRepository) Delete(id string) {
 	delete(r.rooms, id)
 }
 
-func (r *InMemoryRoomsRepository) RunRoomCleanup() {
+func (r *InMemoryRoomsRepository) RunRoomCleanup(manager *client.ConnectionManager) {
 	ticker := time.NewTicker(5 * time.Minute)
 	deleteCount := 0
 
@@ -142,6 +142,7 @@ func (r *InMemoryRoomsRepository) RunRoomCleanup() {
 		for id, room := range r.rooms {
 			if room.ScheduledForDeletion {
 				deleteCount++
+				manager.DeleteRoom(id)
 				delete(r.rooms, id)
 			}
 		}

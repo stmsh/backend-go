@@ -105,6 +105,7 @@ func (c *Client) ReadMessages() {
 				log.Printf("error: %v", err)
 			}
 
+			log.Printf("in ReadMessages. Failed to read message: %s", err.Error())
 			c.Manager.RemoveClient(c)
 			break
 		}
@@ -172,6 +173,22 @@ func (m *ConnectionManager) AssignRoom(c *Client, roomID string) error {
 	c.RoomID = roomID
 
 	return nil
+}
+
+func (m *ConnectionManager) DeleteRoom(roomID string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	roomToDelete, ok := m.rooms[roomID]
+	if !ok {
+		return
+	}
+
+	for _, c := range roomToDelete {
+		m.RemoveClient(c)
+	}
+
+	delete(m.rooms, roomID)
 }
 
 func (m *ConnectionManager) RemoveClient(c *Client) {

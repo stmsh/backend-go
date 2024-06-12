@@ -137,7 +137,7 @@ func main() {
 	})
 
 	go roomsRepository.RunRoomTimer(manager)
-	go roomsRepository.RunRoomCleanup()
+	go roomsRepository.RunRoomCleanup(manager)
 
 	http.ListenAndServe(":8080", r)
 }

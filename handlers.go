@@ -92,6 +92,10 @@ func (h *Handlers) HandleJoin(sender *client.Client, msg client.MessageIncoming)
 			c.Send(playersChanged)
 		})
 
+		if r.ScheduledForDeletion {
+			r.ScheduledForDeletion = false
+		}
+
 		return r, nil
 	})
 

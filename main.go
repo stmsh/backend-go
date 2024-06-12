@@ -56,11 +56,6 @@ func main() {
 
 		r.Post("/first-time", func(w http.ResponseWriter, r *http.Request) {
 			name := r.FormValue("name")
-			if name == "" {
-				fmt.Fprint(w, "<p>Please enter name</p>")
-				return
-			}
-
 			w.Header().Add("set-cookie", "name="+name)
 			w.Header().Add("hx-redirect", "/")
 		})
@@ -76,14 +71,9 @@ func main() {
 	r.Get("/room/{id}", func(w http.ResponseWriter, r *http.Request) {
 		roomID := r.PathValue("id")
 
-		if roomID == "" {
-			fmt.Fprint(w, "<p>Room id is required</p>")
-			return
-		}
-
 		room, ok := rooms[roomID]
 		if !ok {
-			fmt.Fprintf(w, "<p>Room does not exist</p>")
+			w.Write(Render("404.html", nil))
 			return
 		}
 

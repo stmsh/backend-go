@@ -14,7 +14,6 @@
         ></script>
         <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"></script>
 
-        <script src="/public/js/image.js"></script>
         <script src="/public/js/search.js"></script>
         <script src="/public/js/swipe-deck.js"></script>
     </head>
@@ -125,7 +124,7 @@
 
 {{ define "time" }}
 <div id="time" class="w-full flex justify-center">
-    {{ if not eq .Seconds 0 }}
+    {{ if not (eq .Seconds 0) }}
     <span> {{ format_duration . }} </span>
     {{ end }}
 </div>

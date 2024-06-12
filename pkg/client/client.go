@@ -17,7 +17,7 @@ const (
 	baseRoomsCount   = 10
 
 	writeWait  = 10 * time.Second
-	pongWait   = 1 * time.Second
+	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10
 )
 
@@ -90,6 +90,7 @@ func (c *Client) WriteMessages() {
 }
 
 func (c *Client) ReadMessages() {
+	c.conn.SetReadLimit(2048)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))

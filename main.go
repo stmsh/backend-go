@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 
@@ -73,6 +74,10 @@ func main() {
 
 	r.Get("/room/{id}", func(w http.ResponseWriter, r *http.Request) {
 		roomID := r.PathValue("id")
+		_, err := r.Cookie("clientID")
+		if err != nil {
+			w.Header().Add("set-cookie", "clientID="+uuid.NewString())
+		}
 
 		room := roomsRepository.Find(roomID)
 		if room == nil {
@@ -112,6 +117,7 @@ func main() {
 		}
 
 		isHtmx := r.URL.Query().Get("htmx") == "true"
+
 		var serializer client.Serializer
 		if isHtmx {
 			serializer = htmxSerializer
@@ -119,6 +125,11 @@ func main() {
 			serializer = jsonSerializer
 		}
 		client := client.NewClient(conn, manager, serializer)
+		clientID := r.URL.Query().Get("clientID")
+		if clientID != "" {
+			client.ID = clientID
+		}
+
 		manager.AddClient(client)
 
 		go client.WriteMessages()

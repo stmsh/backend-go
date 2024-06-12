@@ -35,7 +35,12 @@
     <script>
         const roomId = location.pathname.split("/").pop();
         document.body.setAttribute("hx-ext", "ws");
-        document.body.setAttribute("ws-connect", "/ws?htmx=true");
+
+        const params = new URLSearchParams();
+        params.set("htmx", "true");
+        params.set("clientID", getCookie("clientID"));
+
+        document.body.setAttribute("ws-connect", "/ws?" + params.toString());
 
         document.addEventListener("htmx:wsOpen", (event) => {
             event.detail.socketWrapper.send(

@@ -29,14 +29,16 @@ func (s *HtmxSerializer) Serialize(message client.MessageOutgoing) (messageType 
 	case EventRoomInit:
 		serialized = append(serialized, Render("time", event.Time))
 		serialized = append(serialized, Render("user", event.User))
-		serialized = append(serialized, Render("actions", event.User))
 
 		switch event.Stage {
 		case StageLobby:
+			serialized = append(serialized, Render("actions", event.User))
 			serialized = append(serialized, Render("stage_lobby", event))
 		case StageVoting:
+			serialized = append(serialized, Render("actions", event.User))
 			serialized = append(serialized, Render("stage_voting", event))
 		case StageResults:
+			serialized = append(serialized, Render("actions_results", event.User))
 			serialized = append(serialized, Render("stage_results", event))
 		}
 
@@ -62,6 +64,7 @@ func (s *HtmxSerializer) Serialize(message client.MessageOutgoing) (messageType 
 		serialized = append(serialized, Render("list", event.List))
 
 	case EventStageResults:
+		serialized = append(serialized, Render("actions_results", nil))
 		serialized = append(serialized, Render("stage_results", event))
 
 	default:

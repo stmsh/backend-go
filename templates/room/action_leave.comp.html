@@ -1,11 +1,10 @@
-{{ define "action_next" }}
-<button
-    id="action_next"
-    ws-send
-    hx-vals='js:{"type":"next_stage"}'
-    class="flex items-baseline text-blue-400 p-3"
+{{ define "action_leave" }}
+<a
+    id="action_leave"
+    href="/"
+    class="flex items-baseline text-red-400 p-3"
 >
-    <span>Next</span>&nbsp;
+    <span>Leave</span>&nbsp;
     <svg
         height="0.5lh"
         viewBox="0 0 12.7 10.583336"
@@ -32,5 +31,5 @@
             />
         </g>
     </svg>
-</button>
+</a>
 {{ end }}

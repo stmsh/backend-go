@@ -30,92 +30,6 @@ class SwipeDeck extends HTMLElement {
         const children = Array.from(this.children);
         children.forEach((child) => this.setup(child));
         document.addEventListener("pointermove", this.handleMove);
-
-        const styles = document.createElement("style");
-        styles.innerHTML = `
-.swipe_deck__item {
-    --swipe-deck-dx: 0px;
-    --swipe-deck-angle: 0deg;
-    --swipe-deck-progress: 0;
-
-    cursor: grab;
-    user-select: none;
-    transform-origin: center;
-    touch-action: none;
-    transform: translateX(var(--swipe-deck-dx)) rotate(var(--swipe-deck-angle));
-}
-
-.swipe_deck__item--dragging {
-    cursor: grabbing;
-    transition: none;
-}
-
-.swipe_deck__item--releasing {
-    transition: transform .1s;
-}
-
-.swipe_deck__item--left::after {
-    content: '👎';
-    font-size: 4rem;
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-
-    display: block;
-    width: 6rem;
-    height: 6rem;
-    border-radius: 50%;
-    line-height: 7rem;
-    text-align: center;
-
-    background-image:   
-        conic-gradient(transparent calc(100% - var(--swipe-deck-progress) * 100%), white 0);
-}
-
-.swipe_deck__item--right::after {
-    content: '👍';
-    font-size: 4rem;
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-
-    display: block;
-    width: 6rem;
-    height: 6rem;
-    border-radius: 50%;
-    text-align: center;
-
-    background-image: 
-        conic-gradient(white calc(var(--swipe-deck-progress) * 100%), transparent 0);
-}
-
-.swipe_deck__item--left::before {
-    position: absolute;
-    display: block;
-    content: '';
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #f87171;
-    opacity: calc(var(--swipe-deck-progress) * 0.8);
-    border-radius: inherit;
-}
-
-.swipe_deck__item--right::before {
-    position: absolute;
-    display: block;
-    content: '';
-    top: 0;
-    right: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #4ade80;
-    opacity: calc(var(--swipe-deck-progress) * 0.8);
-    border-radius: inherit;
-}
-`;
-        document.head.insertAdjacentElement("beforeend", styles);
     }
 
     disconnectedCallback() {
@@ -223,5 +137,92 @@ class SwipeDeck extends HTMLElement {
 function clamp(min, v, max) {
     return Math.min(Math.max(min, v), max);
 }
+
+const styles = document.createElement("style");
+styles.innerHTML = `
+.swipe_deck__item {
+    --swipe-deck-dx: 0px;
+    --swipe-deck-angle: 0deg;
+    --swipe-deck-progress: 0;
+
+    cursor: grab;
+    user-select: none;
+    transform-origin: center;
+    touch-action: none;
+    transform: translateX(var(--swipe-deck-dx)) rotate(var(--swipe-deck-angle));
+}
+
+.swipe_deck__item--dragging {
+    cursor: grabbing;
+    transition: none;
+}
+
+.swipe_deck__item--releasing {
+    transition: transform .1s;
+}
+
+.swipe_deck__item--left::after {
+    content: '👎';
+    font-size: 4rem;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+
+    display: block;
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    line-height: 7rem;
+    text-align: center;
+
+    background-image:   
+        conic-gradient(transparent calc(100% - var(--swipe-deck-progress) * 100%), white 0);
+}
+
+.swipe_deck__item--right::after {
+    content: '👍';
+    font-size: 4rem;
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+
+    display: block;
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    text-align: center;
+
+    background-image: 
+        conic-gradient(white calc(var(--swipe-deck-progress) * 100%), transparent 0);
+}
+
+.swipe_deck__item--left::before {
+    position: absolute;
+    display: block;
+    content: '';
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f87171;
+    opacity: calc(var(--swipe-deck-progress) * 0.8);
+    border-radius: inherit;
+}
+
+.swipe_deck__item--right::before {
+    position: absolute;
+    display: block;
+    content: '';
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #4ade80;
+    opacity: calc(var(--swipe-deck-progress) * 0.8);
+    border-radius: inherit;
+}
+`;
+
+document.head.insertAdjacentElement("beforeend", styles);
 
 customElements.define("swipe-deck", SwipeDeck);

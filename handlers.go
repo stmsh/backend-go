@@ -154,18 +154,19 @@ func HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
 
 	room.Stage = RoomStage(nextStageMap[string(room.Stage)])
 
-	// Currently need to emit player updated event to update actions
-	// Think of different strategy for updating actions
-	for _, p := range room.Players {
-		p.Ready = false
-		sender.Send(NewPlayerUpdatedEvent(user, room))
-	}
-	sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
-
 	switch room.Stage {
 	case StageVoting:
+		// Currently need to emit player updated event to update actions
+		// Think of different strategy for updating actions
+		for _, p := range room.Players {
+			p.Ready = false
+			sender.Send(NewPlayerUpdatedEvent(user, room))
+		}
+		sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(room))
+
 		room.Candidates = collectCandidates(room)
 		sender.Manager.Broadcast(room.ID, NewEventStageVoting(room))
+
 	case StageResults:
 		sender.Manager.Broadcast(room.ID, NewEventStageResults(room))
 	}
@@ -314,7 +315,8 @@ type (
 		List       []listItem     `json:"list"`
 		Players    []player       `json:"players"`
 		Candidates []candidate    `json:"candidates"`
-		Results    []resultsEntry `json:"results"`
+		Winners    []resultsEntry `json:"winners"`
+		Others     []resultsEntry `json:"others"`
 	}
 
 	EventPlayerJoined struct {
@@ -370,13 +372,14 @@ type (
 	}
 
 	resultsEntry struct {
-		Name  string `json:"name"`
-		Score int    `json:"score"`
+		listItem
+		Score int `json:"score"`
 	}
 
 	EventStageResults struct {
 		Type    string         `json:"type"`
-		Results []resultsEntry `json:"results"`
+		Winners []resultsEntry `json:"winners"`
+		Others  []resultsEntry `json:"others"`
 	}
 )
 
@@ -421,6 +424,8 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 		}
 	}
 
+	winners, others := collectResults(room)
+
 	return EventRoomInit{
 		Type: EventTypeRoomInit,
 		ID:   room.ID,
@@ -435,7 +440,8 @@ func NewEventRoomInit(user *Player, room *Room) EventRoomInit {
 		Stage:      room.Stage,
 		Players:    players,
 		Candidates: transformCandidates(room.Candidates),
-		Results:    collectResults(room),
+		Winners:    winners,
+		Others:     others,
 	}
 }
 
@@ -577,25 +583,43 @@ func NewEventVoteRegistered(voter *Player, room *Room) EventVoteRegistered {
 	}
 }
 
-func collectResults(room *Room) []resultsEntry {
-	var results []resultsEntry
-	for _, candidate := range room.Candidates {
-		results = append(results, resultsEntry{
-			Name:  candidate.Title,
-			Score: candidate.Score,
-		})
+func collectResults(room *Room) ([]resultsEntry, []resultsEntry) {
+	results := make([]resultsEntry, len(room.Candidates))
+	for i, candidate := range room.Candidates {
+		results[i] = resultsEntry{
+			listItem: listItem(candidate.ListItem),
+			Score:    candidate.Score,
+		}
 	}
 
 	slices.SortFunc(results, func(a, b resultsEntry) int {
 		return b.Score - a.Score
 	})
 
-	return results
+	var maxScore int
+	if len(results) > 0 {
+		maxScore = results[0].Score
+	}
+
+	winners := make([]resultsEntry, 0, len(results))
+	others := make([]resultsEntry, 0, len(results))
+	for _, item := range results {
+		if item.Score == maxScore {
+			winners = append(winners, item)
+		} else {
+			others = append(others, item)
+		}
+	}
+
+	return winners, others
 }
 
 func NewEventStageResults(room *Room) EventStageResults {
+	winners, others := collectResults(room)
+
 	return EventStageResults{
 		Type:    EventTypeStageResults,
-		Results: collectResults(room),
+		Winners: winners,
+		Others:  others,
 	}
 }

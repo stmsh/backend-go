@@ -40,6 +40,8 @@ func (s *HtmxSerializer) Serialize(message client.MessageOutgoing) (messageType 
 		case StageResults:
 			serialized = append(serialized, Render("actions_results", event.User))
 			serialized = append(serialized, Render("stage_results", event))
+			serialized = append(serialized, Render("results_winners", event.Winners))
+			serialized = append(serialized, Render("results_others", event.Others))
 		}
 
 	case EventPlayersChanged:

@@ -69,7 +69,7 @@ func (h *Handlers) HandleJoin(sender *ws.Client, msg ws.MessageIncoming) {
 		return
 	}
 
-	err := h.rooms.Update(payload.RoomID, func(r *Room) (*Room, error) {
+	err := h.rooms.Update(payload.RoomID, func(r *Room) error {
 		sender.Manager.AssignRoom(sender, payload.RoomID)
 
 		newPlayer := Player{
@@ -96,7 +96,7 @@ func (h *Handlers) HandleJoin(sender *ws.Client, msg ws.MessageIncoming) {
 			r.ScheduledForDeletion = false
 		}
 
-		return r, nil
+		return nil
 	})
 
 	if err != nil {
@@ -112,7 +112,7 @@ func (h *Handlers) HandleToggleReady(sender *ws.Client, msg ws.MessageIncoming) 
 		return
 	}
 
-	h.rooms.Update(sender.RoomID, func(r *Room) (*Room, error) {
+	h.rooms.Update(sender.RoomID, func(r *Room) error {
 		p := r.Players[sender.ID]
 		p.Ready = payload.Ready
 		r.Players[sender.ID] = p
@@ -120,12 +120,12 @@ func (h *Handlers) HandleToggleReady(sender *ws.Client, msg ws.MessageIncoming) 
 		sender.Send(NewPlayerUpdatedEvent(p, *r))
 		sender.Manager.Broadcast(r.ID, NewEventPlayersChanged(*r))
 
-		return r, nil
+		return nil
 	})
 }
 
 func (h *Handlers) HandleLeave(sender *ws.Client) {
-	h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	h.rooms.Update(sender.RoomID, func(room *Room) error {
 		delete(room.Players, sender.ID)
 
 		if room.HostID == sender.ID {
@@ -155,19 +155,19 @@ func (h *Handlers) HandleLeave(sender *ws.Client) {
 			room.ScheduledForDeletion = true
 		}
 
-		return room, nil
+		return nil
 	})
 }
 
 func (h *Handlers) HandleChangeStage(sender *ws.Client, _ ws.MessageIncoming) {
-	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		user := room.Players[sender.ID]
 		if user.ID != room.HostID {
-			return nil, fmt.Errorf("Only host can change stage")
+			return fmt.Errorf("Only host can change stage")
 		}
 
 		if room.Stage == StageResults {
-			return nil, fmt.Errorf("Can't change stage. Final stage reached")
+			return fmt.Errorf("Can't change stage. Final stage reached")
 		}
 
 		room.Stage = RoomStage(nextStageMap[string(room.Stage)])
@@ -190,7 +190,7 @@ func (h *Handlers) HandleChangeStage(sender *ws.Client, _ ws.MessageIncoming) {
 			sender.Manager.Broadcast(room.ID, NewEventStageResults(*room))
 		}
 
-		return room, nil
+		return nil
 	})
 
 	if err != nil {
@@ -199,21 +199,21 @@ func (h *Handlers) HandleChangeStage(sender *ws.Client, _ ws.MessageIncoming) {
 }
 
 func (h *Handlers) HandleSetTimer(sender *ws.Client, msg ws.MessageIncoming) {
-	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		user := room.Players[sender.ID]
 		if user.ID != room.HostID {
-			return nil, fmt.Errorf("Only host can change stage")
+			return fmt.Errorf("Only host can change stage")
 		}
 
 		var payload MessageSetTimer
 		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-			return nil, err
+			return err
 		}
 
 		room.Time = time.Duration(payload.TimeInSeconds) * time.Second
 		sender.Manager.Broadcast(room.ID, NewTimerSetEvent(*room))
 
-		return room, nil
+		return nil
 	})
 
 	if err != nil {
@@ -228,14 +228,14 @@ func (h *Handlers) HandleListAdd(sender *ws.Client, msg ws.MessageIncoming) {
 		return
 	}
 
-	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		user := room.Players[sender.ID]
 		newItemID := strconv.Itoa(payload.ID)
 
 		if slices.ContainsFunc(room.Lists[user.ID], func(item ListItem) bool {
 			return item.ID == newItemID
 		}) {
-			return nil, fmt.Errorf("Item already in the list")
+			return fmt.Errorf("Item already in the list")
 		}
 
 		listItem := ListItem{
@@ -252,7 +252,7 @@ func (h *Handlers) HandleListAdd(sender *ws.Client, msg ws.MessageIncoming) {
 		listChanged := NewEventListChanged(room.Lists[user.ID])
 		sender.Send(listChanged)
 
-		return room, nil
+		return nil
 	})
 
 	if err != nil {
@@ -267,7 +267,7 @@ func (h *Handlers) HandleListRemove(sender *ws.Client, msg ws.MessageIncoming) {
 		return
 	}
 
-	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		user := room.Players[sender.ID]
 
 		updatedList := slices.DeleteFunc(room.Lists[user.ID], func(v ListItem) bool {
@@ -277,7 +277,7 @@ func (h *Handlers) HandleListRemove(sender *ws.Client, msg ws.MessageIncoming) {
 		room.Lists[user.ID] = updatedList
 		sender.Send(NewEventListChanged(updatedList))
 
-		return room, nil
+		return nil
 	})
 
 	if err != nil {
@@ -292,16 +292,16 @@ func (h *Handlers) HandleVote(sender *ws.Client, msg ws.MessageIncoming) {
 		return
 	}
 
-	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
+	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		if room.Stage != StageVoting {
-			return nil, fmt.Errorf("Not in voting stage")
+			return fmt.Errorf("Not in voting stage")
 		}
 
 		user := room.Players[sender.ID]
 		for i, candidate := range room.Candidates {
 			if candidate.ID == payload.ID {
 				if slices.Contains(candidate.Votes, user.ID) {
-					return nil, fmt.Errorf("Already voted for %s", candidate.ID)
+					return fmt.Errorf("Already voted for %s", candidate.ID)
 				}
 
 				room.Candidates[i].Votes = append(room.Candidates[i].Votes, user.ID)
@@ -322,7 +322,7 @@ func (h *Handlers) HandleVote(sender *ws.Client, msg ws.MessageIncoming) {
 		}
 		sender.Send(event)
 
-		return room, nil
+		return nil
 	})
 
 	if err != nil {

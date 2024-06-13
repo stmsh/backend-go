@@ -69,7 +69,7 @@ func NewRoom() Room {
 type RoomsRepository interface {
 	Add(room Room)
 	Find(id string) *Room
-	Update(id string, updateFn func(*Room) (*Room, error)) error
+	Update(id string, updateFn func(*Room) error) error
 	Delete(id string)
 }
 
@@ -104,7 +104,7 @@ func (r *InMemoryRoomsRepository) Find(id string) *Room {
 	return &room
 }
 
-func (r *InMemoryRoomsRepository) Update(id string, updateFn func(room *Room) (*Room, error)) error {
+func (r *InMemoryRoomsRepository) Update(id string, updateFn func(room *Room) error) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -113,12 +113,12 @@ func (r *InMemoryRoomsRepository) Update(id string, updateFn func(room *Room) (*
 		return fmt.Errorf("Room doesn't exist")
 	}
 
-	updatedRoom, err := updateFn(&room)
+	err := updateFn(&room)
 	if err != nil {
 		return err
 	}
 
-	r.rooms[room.ID] = *updatedRoom
+	r.rooms[room.ID] = room
 
 	return nil
 }

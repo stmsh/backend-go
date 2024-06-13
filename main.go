@@ -4,21 +4,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 
-	"stmsh/pkg/client"
 	t "stmsh/pkg/templates"
-)
-
-const (
-	writeWait  = 10 * time.Second
-	pongWait   = 10 * time.Second
-	pingPeriod = (pongWait * 9) / 10
+	"stmsh/pkg/ws"
 )
 
 var upgrader = websocket.Upgrader{
@@ -30,14 +23,17 @@ var upgrader = websocket.Upgrader{
 var htmxSerializer = &HtmxSerializer{}
 var jsonSerializer = &JsonSerializer{}
 
-func main() {
-	roomsRepository := NewInMemoryRoomsRepository()
-
-	r := chi.NewRouter()
+func init() {
 	err := godotenv.Load(".env.local", ".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+}
+
+func main() {
+	roomsRepository := NewInMemoryRoomsRepository()
+
+	r := chi.NewRouter()
 
 	fs := http.FileServer(http.Dir("./public"))
 	r.Handle("/public/*", http.StripPrefix("/public/", fs))
@@ -91,9 +87,9 @@ func main() {
 
 	handlers := NewHandlers(roomsRepository)
 
-	manager := client.NewConnectionManager(handlers.HandleLeave)
-	EnsureRoom := func(handler client.EventHandler) client.EventHandler {
-		return func(c *client.Client, m client.MessageIncoming) {
+	manager := ws.NewConnectionManager(handlers.HandleLeave)
+	EnsureRoom := func(handler ws.EventHandler) ws.EventHandler {
+		return func(c *ws.Client, m ws.MessageIncoming) {
 			if c.RoomID == "" {
 				c.ReportError(fmt.Errorf("Join room first"))
 				return
@@ -119,13 +115,13 @@ func main() {
 
 		isHtmx := r.URL.Query().Get("htmx") == "true"
 
-		var serializer client.Serializer
+		var serializer ws.Serializer
 		if isHtmx {
 			serializer = htmxSerializer
 		} else {
 			serializer = jsonSerializer
 		}
-		client := client.NewClient(conn, manager, serializer)
+		client := ws.NewClient(conn, manager, serializer)
 		clientID := r.URL.Query().Get("clientID")
 		if clientID != "" {
 			client.ID = clientID

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"stmsh/pkg/client"
+	"stmsh/pkg/ws"
 )
 
 type Player struct {
@@ -130,7 +130,7 @@ func (r *InMemoryRoomsRepository) Delete(id string) {
 	delete(r.rooms, id)
 }
 
-func (r *InMemoryRoomsRepository) RunRoomCleanup(manager *client.ConnectionManager) {
+func (r *InMemoryRoomsRepository) RunRoomCleanup(manager *ws.ConnectionManager) {
 	ticker := time.NewTicker(5 * time.Minute)
 	deleteCount := 0
 
@@ -153,7 +153,7 @@ func (r *InMemoryRoomsRepository) RunRoomCleanup(manager *client.ConnectionManag
 	}
 }
 
-func (r *InMemoryRoomsRepository) RunRoomTimer(manager *client.ConnectionManager) {
+func (r *InMemoryRoomsRepository) RunRoomTimer(manager *ws.ConnectionManager) {
 	ticker := time.NewTicker(1 * time.Second)
 
 	for {

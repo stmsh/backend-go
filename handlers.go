@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"stmsh/pkg/client"
+	"stmsh/pkg/ws"
 )
 
 type (
@@ -62,7 +62,7 @@ func NewHandlers(repo RoomsRepository) *Handlers {
 	}
 }
 
-func (h *Handlers) HandleJoin(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleJoin(sender *ws.Client, msg ws.MessageIncoming) {
 	var payload MessageJoin
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -85,7 +85,7 @@ func (h *Handlers) HandleJoin(sender *client.Client, msg client.MessageIncoming)
 		sender.Send(NewEventRoomInit(newPlayer, *r))
 		playerJoined := NewEventPlayerJoined(newPlayer)
 		playersChanged := NewEventPlayersChanged(*r)
-		sender.Manager.BroadcastFunc(r.ID, func(c *client.Client) {
+		sender.Manager.BroadcastFunc(r.ID, func(c *ws.Client) {
 			if c != sender {
 				c.Send(playerJoined)
 			}
@@ -105,7 +105,7 @@ func (h *Handlers) HandleJoin(sender *client.Client, msg client.MessageIncoming)
 	}
 }
 
-func (h *Handlers) HandleToggleReady(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleToggleReady(sender *ws.Client, msg ws.MessageIncoming) {
 	var payload MessageUserToggleReady
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -124,7 +124,7 @@ func (h *Handlers) HandleToggleReady(sender *client.Client, msg client.MessageIn
 	})
 }
 
-func (h *Handlers) HandleLeave(sender *client.Client) {
+func (h *Handlers) HandleLeave(sender *ws.Client) {
 	h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
 		delete(room.Players, sender.ID)
 
@@ -139,7 +139,7 @@ func (h *Handlers) HandleLeave(sender *client.Client) {
 
 			if room.HostID != "" {
 				hostChanged := NewHostChangedEvent(room.Players[room.HostID])
-				sender.Manager.BroadcastFunc(room.ID, func(c *client.Client) {
+				sender.Manager.BroadcastFunc(room.ID, func(c *ws.Client) {
 					c.Send(hostChanged)
 					// notify new host that its data changed
 					if c.ID == room.HostID {
@@ -159,7 +159,7 @@ func (h *Handlers) HandleLeave(sender *client.Client) {
 	})
 }
 
-func (h *Handlers) HandleChangeStage(sender *client.Client, _ client.MessageIncoming) {
+func (h *Handlers) HandleChangeStage(sender *ws.Client, _ ws.MessageIncoming) {
 	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
 		user := room.Players[sender.ID]
 		if user.ID != room.HostID {
@@ -198,7 +198,7 @@ func (h *Handlers) HandleChangeStage(sender *client.Client, _ client.MessageInco
 	}
 }
 
-func (h *Handlers) HandleSetTimer(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleSetTimer(sender *ws.Client, msg ws.MessageIncoming) {
 	err := h.rooms.Update(sender.RoomID, func(room *Room) (*Room, error) {
 		user := room.Players[sender.ID]
 		if user.ID != room.HostID {
@@ -221,7 +221,7 @@ func (h *Handlers) HandleSetTimer(sender *client.Client, msg client.MessageIncom
 	}
 }
 
-func (h *Handlers) HandleListAdd(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleListAdd(sender *ws.Client, msg ws.MessageIncoming) {
 	var payload MessageListAdd
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -260,7 +260,7 @@ func (h *Handlers) HandleListAdd(sender *client.Client, msg client.MessageIncomi
 	}
 }
 
-func (h *Handlers) HandleListRemove(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleListRemove(sender *ws.Client, msg ws.MessageIncoming) {
 	var payload MessageListRemove
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)
@@ -285,7 +285,7 @@ func (h *Handlers) HandleListRemove(sender *client.Client, msg client.MessageInc
 	}
 }
 
-func (h *Handlers) HandleVote(sender *client.Client, msg client.MessageIncoming) {
+func (h *Handlers) HandleVote(sender *ws.Client, msg ws.MessageIncoming) {
 	var payload MessageVote
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		sender.ReportError(err)

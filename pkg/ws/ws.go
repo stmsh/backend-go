@@ -1,4 +1,4 @@
-package client
+package ws
 
 import (
 	"encoding/json"

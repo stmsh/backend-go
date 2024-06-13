@@ -5,13 +5,13 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"stmsh/pkg/client"
 	t "stmsh/pkg/templates"
+	"stmsh/pkg/ws"
 )
 
 type JsonSerializer struct{}
 
-func (s *JsonSerializer) Serialize(message client.MessageOutgoing) (messageType int, serialized [][]byte) {
+func (s *JsonSerializer) Serialize(message ws.MessageOutgoing) (messageType int, serialized [][]byte) {
 	messageType = websocket.TextMessage
 	msg, err := json.Marshal(message)
 	if err == nil {
@@ -23,7 +23,7 @@ func (s *JsonSerializer) Serialize(message client.MessageOutgoing) (messageType 
 
 type HtmxSerializer struct{}
 
-func (s *HtmxSerializer) Serialize(message client.MessageOutgoing) (messageType int, serialized [][]byte) {
+func (s *HtmxSerializer) Serialize(message ws.MessageOutgoing) (messageType int, serialized [][]byte) {
 	messageType = websocket.TextMessage
 
 	switch event := message.(type) {

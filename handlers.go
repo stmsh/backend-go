@@ -477,7 +477,8 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 	}
 
 	winners, others := collectResults(room)
-	candidates := transformCandidates(collectRemainingCandidates(user, room))
+	candidates := transformCandidates(
+		tail(collectRemainingCandidates(user, room), LimitCandidates))
 
 	return EventRoomInit{
 		Type: EventTypeRoomInit,
@@ -492,7 +493,7 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 		List:       list,
 		Stage:      room.Stage,
 		Players:    players,
-		Candidates: tail(candidates, LimitCandidates),
+		Candidates: candidates,
 		Winners:    winners,
 		Others:     others,
 	}
@@ -615,10 +616,9 @@ func transformCandidates(candidates []Candidate) []candidate {
 }
 
 func NewEventStageVoting(room Room) EventStageVoting {
-
 	return EventStageVoting{
 		Type:       EventTypeStageVoting,
-		Candidates: tail(transformCandidates(room.Candidates), LimitCandidates),
+		Candidates: transformCandidates(tail(room.Candidates, LimitCandidates)),
 	}
 }
 
@@ -635,11 +635,12 @@ func collectRemainingCandidates(player Player, room Room) []Candidate {
 }
 
 func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
-	candidates := transformCandidates(collectRemainingCandidates(voter, room))
+	candidates := transformCandidates(
+		tail(collectRemainingCandidates(voter, room), LimitCandidates))
 
 	return EventVoteRegistered{
 		Type:           EventTypeVoteRegistered,
-		CandidatesLeft: tail(candidates, LimitCandidates),
+		CandidatesLeft: candidates,
 	}
 }
 

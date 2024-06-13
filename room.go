@@ -159,12 +159,14 @@ func (r *InMemoryRoomsRepository) RunRoomTimer(manager *client.ConnectionManager
 	for {
 		<-ticker.C
 		r.lock.Lock()
-		for _, room := range r.rooms {
+		for id, room := range r.rooms {
 			if room.Time <= 0 {
 				continue
 			}
 
 			room.Time = room.Time - 1*time.Second
+			r.rooms[id] = room
+
 			manager.Broadcast(room.ID, NewEventRoomTime(room))
 		}
 		r.lock.Unlock()

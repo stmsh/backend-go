@@ -236,57 +236,63 @@
 {{ end }}
 <!---->
 
-{{ define "stage_results" }}
-<div id="stage" class="flex grow flex-col min-h-0 p-4 overflow-y-auto gap-4">
-    <section>
-        <h1 class="text-xl">
-            {{ if gt (len .Winners) 1 }} Winners {{ else }} Winner {{ end }}
-        </h1>
-        <ul
-            class="flex overflow-x-auto gap-4 py-4 justify-around"
-            style="scroll-snap-type: x mandatory"
+{{ define "results_winners" }}
+<section id="winners">
+    <h1 class="text-xl">Winner{{- if gt (len .) 1 }}s{{- end }} 🎉</h1>
+    <ul
+        class="flex overflow-x-auto gap-4 py-4 justify-around"
+        style="scroll-snap-type: x mandatory"
+    >
+        {{ range . }}
+        <li
+            class="flex flex-col min-w-52 w-52 shadow-lg rounded-md"
+            style="scroll-snap-align: center"
         >
-            {{ range .Winners }}
-            <li
-                class="flex flex-col min-w-52 w-52 shadow-lg rounded-md"
-                style="scroll-snap-align: center"
-            >
+            <img
+                src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
+                alt="Poster to {{ .Title }}"
+                class="w-full mx-auto aspect-[2/3] rounded-t-lg object-cover"
+                onerror="this.onerror=null;this.src='/public/no_poster.svg'"
+            />
+            <p>{{ .Title }}</p>
+            <p>Score: {{ .Score }}</p>
+        </li>
+        {{ end }}
+    </ul>
+</section>
+{{ end }}
+<!---->
+
+{{ define "results_others" }}
+<section id="others">
+    <h1 class="pb-4 text-xl">Others</h1>
+    <ul class="flex flex-col flex-grow gap-2">
+        {{ range . }}
+        <li>
+            <div class="flex gap-2 relative">
                 <img
                     src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
                     alt="Poster to {{ .Title }}"
-                    class="w-full mx-auto aspect-[2/3] rounded-t-lg object-cover"
-                    onerror="this.onerror=null;this.src='/public/no_poster.svg'"
+                    class="h-36 aspect-[2/3] object-contain"
+                    onerror='this.onerror=null;this.src="/public/no_poster.svg"'
                 />
-                <p>{{ .Title }}</p>
-                <p>Score: {{ .Score }}</p>
-            </li>
-            {{ end }}
-        </ul>
-    </section>
 
-    <section>
-        <h1 class="pb-4 text-xl">Others</h1>
-        <ul class="flex flex-col flex-grow gap-2">
-            {{ range .Others }}
-            <li>
-                <div class="flex gap-2 relative">
-                    <img
-                        src="https://image.tmdb.org/t/p/w500/{{ .PosterPath }}"
-                        alt="Poster to {{ .Title }}"
-                        class="h-36 aspect-[2/3] object-contain"
-                        onerror='this.onerror=null;this.src="/public/no_poster.svg"'
-                    />
-
-                    <div>
-                        <h2>{{ .Title }}</h2>
-                        <p>Score: {{ .Score }}</p>
-                    </div>
+                <div>
+                    <h2>{{ .Title }}</h2>
+                    <p>Score: {{ .Score }}</p>
                 </div>
-            </li>
-            {{ end }}
-        </ul>
-    </section>
-    <!---->
+            </div>
+        </li>
+        {{ end }}
+    </ul>
+</section>
+{{ end }}
+<!---->
+
+{{ define "stage_results" }}
+<div id="stage" class="flex grow flex-col min-h-0 p-4 overflow-y-auto gap-4">
+    <section id="winners"></section>
+    <section id="others"></section>
 </div>
 {{ end }}
 <!---->

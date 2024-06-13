@@ -1,0 +1,31 @@
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Welcome</title>
+
+        <link rel="stylesheet" href="/public/output.css" />
+        <script
+            src="https://unpkg.com/htmx.org@1.9.12"
+            integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
+            crossorigin="anonymous"
+        ></script>
+    </head>
+    <body
+        class="max-w-[768px] h-dvh m-auto flex flex-col items-center justify-around overflow-hidden"
+    >
+        <main class="flex flex-col items-center">
+            <p>Ask your friend for an invite to a room</p>
+            <p>or</p>
+            <p>
+                <button
+                    hx-post="/create"
+                    class="inline text-blue-400 decoration-blue-400 underline"
+                >
+                    Create
+                </button>
+                your own
+            </p>
+        </main>
+    </body>
+</html>

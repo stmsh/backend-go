@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"stmsh/pkg/client"
+	t "stmsh/pkg/templates"
 )
 
 const (
@@ -50,12 +51,12 @@ func main() {
 			return
 		}
 
-		w.Write(Render("index.html", nil))
+		w.Write(t.Render("index.html", nil))
 	})
 
 	r.Group(func(r chi.Router) {
 		r.Get("/first-time", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(Render("first-time.html", nil))
+			w.Write(t.Render("first-time.html", nil))
 		})
 
 		r.Post("/first-time", func(w http.ResponseWriter, r *http.Request) {
@@ -81,11 +82,11 @@ func main() {
 
 		room := roomsRepository.Find(roomID)
 		if room == nil {
-			w.Write(Render("404.html", nil))
+			w.Write(t.Render("404.html", nil))
 			return
 		}
 
-		w.Write(Render("room", room))
+		w.Write(t.Render("room", room))
 	})
 
 	handlers := NewHandlers(roomsRepository)

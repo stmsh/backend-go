@@ -320,7 +320,7 @@ func (h *Handlers) HandleVote(sender *client.Client, msg client.MessageIncoming)
 			sender.Send(NewPlayerUpdatedEvent(user, *room))
 			sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(*room))
 		}
-		sender.Send(NewEventVoteRegistered(user, *room))
+		sender.Send(event)
 
 		return room, nil
 	})
@@ -447,6 +447,10 @@ const (
 	EventTypeListChanged   = "player:list_changed"
 )
 
+const (
+	LimitCandidates = 5
+)
+
 func NewEventRoomInit(user Player, room Room) EventRoomInit {
 	players := make([]player, 0, len(room.Players))
 
@@ -473,6 +477,7 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 	}
 
 	winners, others := collectResults(room)
+	candidates := transformCandidates(collectRemainingCandidates(user, room))
 
 	return EventRoomInit{
 		Type: EventTypeRoomInit,
@@ -487,7 +492,7 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 		List:       list,
 		Stage:      room.Stage,
 		Players:    players,
-		Candidates: transformCandidates(collectRemainingCandidates(user, room)),
+		Candidates: tail(candidates, LimitCandidates),
 		Winners:    winners,
 		Others:     others,
 	}
@@ -610,9 +615,10 @@ func transformCandidates(candidates []Candidate) []candidate {
 }
 
 func NewEventStageVoting(room Room) EventStageVoting {
+
 	return EventStageVoting{
 		Type:       EventTypeStageVoting,
-		Candidates: transformCandidates(room.Candidates),
+		Candidates: tail(transformCandidates(room.Candidates), LimitCandidates),
 	}
 }
 
@@ -629,10 +635,11 @@ func collectRemainingCandidates(player Player, room Room) []Candidate {
 }
 
 func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
+	candidates := transformCandidates(collectRemainingCandidates(voter, room))
 
 	return EventVoteRegistered{
 		Type:           EventTypeVoteRegistered,
-		CandidatesLeft: transformCandidates(collectRemainingCandidates(voter, room)),
+		CandidatesLeft: tail(candidates, LimitCandidates),
 	}
 }
 
@@ -675,4 +682,9 @@ func NewEventStageResults(room Room) EventStageResults {
 		Winners: winners,
 		Others:  others,
 	}
+}
+
+func tail[S ~[]E, E any](s S, n int) S {
+	start := max(len(s)-n-1, 0)
+	return s[start:]
 }

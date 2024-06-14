@@ -13,8 +13,10 @@ test("happy path", async ({ page, browser }) => {
     await expect(page).toHaveURL(/room\/.+/);
     const roomUrl = page.url();
 
-    const queries = Array.from({ length: 5 }, (_, i) => String.fromCodePoint(i + "a".charCodeAt(0)));
-    const n = queries.length + 1
+    const queries = Array.from({ length: 5 }, (_, i) =>
+        String.fromCodePoint(i + "a".charCodeAt(0))
+    );
+    const n = queries.length + 1;
     const pages = await Promise.all(
         queries.map(async () => {
             const ctx = await browser.newContext();
@@ -22,9 +24,11 @@ test("happy path", async ({ page, browser }) => {
         })
     );
 
-    pages.forEach((p, i) => {
-        simulateUserAddingSuggestions(p, roomUrl, queries[i]);
-    });
+    await Promise.all(
+        pages.map((p, i) => {
+            return simulateUserAddingSuggestions(p, roomUrl, queries[i]);
+        })
+    );
 
     await page.getByRole("button", { name: "Ready" }).click();
     await expect(page.locator("#players summary")).toHaveText(`${n}/${n}`);
@@ -44,19 +48,30 @@ test("happy path", async ({ page, browser }) => {
             const size = page.viewportSize()!;
             const from = { x: size.width / 2, y: size.height / 2 };
             const to = { x: from.x + 200, y: from.y };
+            const remains = page.locator("#remains_total");
 
-            let count = 0;
+            let limit = 0;
+            const nSwipes = Number(
+                (await remains.textContent())?.split(" ")[1]
+            );
+            for (let i = 0; i < nSwipes; i++) {
+                expect(
+                    await page
+                        .locator("swipe-deck")
+                        .evaluate((el) => el.childElementCount)
+                ).toBeGreaterThan(0);
+
+                await swipe(page, from, to);
+            }
+
             while (
-                (await page.locator("#remains_total").textContent()) !=
-                "Remains: 0" &&
-                count++ < 500
+                (await remains.textContent()) != "Remains: 0" &&
+                limit++ < 500
             ) {
                 await swipe(page, from, to);
             }
 
-            await expect(page.locator("#remains_total")).toHaveText(
-                "Remains: 0"
-            );
+            await expect(remains).toHaveText("Remains: 0");
         })
     );
 
@@ -71,7 +86,9 @@ test("happy path", async ({ page, browser }) => {
     );
 
     await page.getByRole("link", { name: "Leave" }).click();
-    await expect(page).toHaveURL(new RegExp(process.env.BASE_URL || "localhost:8080" + "/$"));
+    await expect(page).toHaveURL(
+        new RegExp(process.env.BASE_URL || "localhost:8080" + "/$")
+    );
 });
 
 async function simulateUserAddingSuggestions(

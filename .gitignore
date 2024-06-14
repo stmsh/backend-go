@@ -2,3 +2,5 @@ tmp
 app
 .env
 .env.*
+
+node_modules

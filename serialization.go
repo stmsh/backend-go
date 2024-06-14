@@ -56,6 +56,7 @@ func (s *HtmxSerializer) Serialize(message ws.MessageOutgoing) (messageType int,
 		serialized = append(serialized, t.Render("stage_voting", event))
 
 	case EventVoteRegistered:
+		serialized = append(serialized, t.Render("remains_total", event.Total))
 		serialized = append(serialized, t.Render("candidates", event.CandidatesLeft))
 
 	case EventRoomTime:

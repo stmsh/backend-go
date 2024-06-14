@@ -231,6 +231,10 @@
 
 {{ define "stage_voting" }}
 <div id="stage" class="flex grow flex-col min-h-0 p-4">
+    {{ block "remains_total" .Total }}
+    <div id="remains_total">Remains: {{ . }}</div>
+    {{ end }}
+    <!---->
     {{ template "candidates" .Candidates }}
 </div>
 {{ end }}

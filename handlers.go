@@ -179,8 +179,10 @@ func (h *Handlers) HandleChangeStage(sender *ws.Client, _ ws.MessageIncoming) {
 			for _, p := range room.Players {
 				p.Ready = false
 				room.Players[p.ID] = p
-				sender.Send(NewPlayerUpdatedEvent(user, *room))
 			}
+			sender.Manager.BroadcastFunc(room.ID, func(c *ws.Client) {
+				c.Send(NewPlayerUpdatedEvent(room.Players[c.ID], *room))
+			})
 			sender.Manager.Broadcast(room.ID, NewEventPlayersChanged(*room))
 
 			room.Candidates = collectCandidates(*room)
@@ -362,6 +364,7 @@ type (
 		Time       time.Duration  `json:"time"`
 		List       []listItem     `json:"list"`
 		Players    []player       `json:"players"`
+		Total      int            `json:"total"`
 		Candidates []candidate    `json:"candidates"`
 		Winners    []resultsEntry `json:"winners"`
 		Others     []resultsEntry `json:"others"`
@@ -411,11 +414,13 @@ type (
 
 	EventStageVoting struct {
 		Type       string      `json:"type"`
+		Total      int         `json:"total"`
 		Candidates []candidate `json:"candidates"`
 	}
 
 	EventVoteRegistered struct {
 		Type           string      `json:"type"`
+		Total          int         `json:"total"`
 		CandidatesLeft []candidate `json:"candidates"`
 	}
 
@@ -477,8 +482,8 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 	}
 
 	winners, others := collectResults(room)
-	candidates := transformCandidates(
-		tail(collectRemainingCandidates(user, room), LimitCandidates))
+	remaining := collectRemainingCandidates(user, room)
+	candidates := transformCandidates(tail(remaining, LimitCandidates))
 
 	return EventRoomInit{
 		Type: EventTypeRoomInit,
@@ -493,6 +498,7 @@ func NewEventRoomInit(user Player, room Room) EventRoomInit {
 		List:       list,
 		Stage:      room.Stage,
 		Players:    players,
+		Total:      len(remaining),
 		Candidates: candidates,
 		Winners:    winners,
 		Others:     others,
@@ -618,6 +624,7 @@ func transformCandidates(candidates []Candidate) []candidate {
 func NewEventStageVoting(room Room) EventStageVoting {
 	return EventStageVoting{
 		Type:       EventTypeStageVoting,
+		Total:      len(room.Candidates),
 		Candidates: transformCandidates(tail(room.Candidates, LimitCandidates)),
 	}
 }
@@ -635,11 +642,13 @@ func collectRemainingCandidates(player Player, room Room) []Candidate {
 }
 
 func NewEventVoteRegistered(voter Player, room Room) EventVoteRegistered {
+	remaining := collectRemainingCandidates(voter, room)
 	candidates := transformCandidates(
-		tail(collectRemainingCandidates(voter, room), LimitCandidates))
+		tail(remaining, LimitCandidates))
 
 	return EventVoteRegistered{
 		Type:           EventTypeVoteRegistered,
+		Total:          len(remaining),
 		CandidatesLeft: candidates,
 	}
 }

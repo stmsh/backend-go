@@ -70,11 +70,13 @@ func (c *Client) WriteMessages() {
 		case msg, ok := <-c.egress:
 			if !ok {
 				log.Printf("Client %s has disconnected", c.ID)
+				c.conn.WriteMessage(websocket.CloseMessage, nil)
 				return
 			}
 
 			messageType, messages := c.Serializer.Serialize(msg)
 			for i := range messages {
+				c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 				c.conn.WriteMessage(messageType, messages[i])
 			}
 
@@ -103,10 +105,11 @@ func (c *Client) ReadMessages() {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
 			) {
-				log.Printf("error: %v", err)
+				log.Printf("in ReadMessages. Unexpected close error: %s", err.Error())
+			} else {
+				log.Printf("in ReadMessages. Failed to read message: %s", err.Error())
 			}
 
-			log.Printf("in ReadMessages. Failed to read message: %s", err.Error())
 			c.Manager.RemoveClient(c)
 			break
 		}

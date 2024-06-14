@@ -2,7 +2,7 @@ import { test, expect, Page } from "@playwright/test";
 
 test("happy path", async ({ page, browser }) => {
     test.setTimeout(60_000);
-    await page.goto("https://backend-go-x74i.onrender.com/");
+    await page.goto(process.env.BASE_URL || "localhost:8080");
     await expect(page).toHaveURL(/first-time/);
 
     const nameInput = page.getByPlaceholder("Enter username...");
@@ -13,7 +13,8 @@ test("happy path", async ({ page, browser }) => {
     await expect(page).toHaveURL(/room\/.+/);
     const roomUrl = page.url();
 
-    const queries = ["a", "b", "c", "d"];
+    const queries = Array.from({ length: 5 }, (_, i) => String.fromCodePoint(i + "a".charCodeAt(0)));
+    const n = queries.length + 1
     const pages = await Promise.all(
         queries.map(async () => {
             const ctx = await browser.newContext();
@@ -26,14 +27,14 @@ test("happy path", async ({ page, browser }) => {
     });
 
     await page.getByRole("button", { name: "Ready" }).click();
-    await expect(page.locator("#players summary")).toHaveText("5/5");
+    await expect(page.locator("#players summary")).toHaveText(`${n}/${n}`);
 
     await page.getByRole("button", { name: "Next" }).click();
 
     await Promise.all(
         pages.map(async (p) => {
             return await expect(p.locator("#players summary")).toHaveText(
-                "0/5"
+                `0/${n}`
             );
         })
     );
@@ -59,7 +60,7 @@ test("happy path", async ({ page, browser }) => {
         })
     );
 
-    await expect(page.locator("#players summary")).toHaveText("4/5");
+    await expect(page.locator("#players summary")).toHaveText(`${n - 1}/${n}`);
     await page.getByRole("button", { name: "Next" }).click();
 
     await Promise.all(
@@ -70,7 +71,7 @@ test("happy path", async ({ page, browser }) => {
     );
 
     await page.getByRole("link", { name: "Leave" }).click();
-    await expect(page).toHaveURL(/backend-go-x74i\.onrender\.com\/$/);
+    await expect(page).toHaveURL(new RegExp(process.env.BASE_URL || "localhost:8080" + "/$"));
 });
 
 async function simulateUserAddingSuggestions(

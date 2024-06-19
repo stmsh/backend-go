@@ -39,7 +39,8 @@ type Candidate struct {
 
 	SuggestedBy string
 	Score       int
-	Votes       []string
+	// contains all users who voted, including negative voters
+	Voters []string
 }
 
 type Room struct {

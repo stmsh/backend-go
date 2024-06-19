@@ -80,8 +80,8 @@ func (c *Client) WriteMessages() {
 				c.conn.WriteMessage(messageType, messages[i])
 			}
 
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		case t := <-ticker.C:
+			c.conn.SetWriteDeadline(t.Add(writeWait))
 			err := c.conn.WriteMessage(websocket.PingMessage, nil)
 			if err != nil {
 				log.Printf("in WriteMessages. Failed to write ping message: %s", err.Error())
@@ -224,7 +224,7 @@ func (m *ConnectionManager) RegisterEventHandler(event string, handler EventHand
 func (m *ConnectionManager) handleMessage(client *Client, message MessageIncoming) {
 	handler, ok := m.handlers[message.Type]
 	if !ok {
-		log.Printf("Unhandled message type %q", message.Type)
+		log.Printf("in handleMessage. Unhandled message type %q", message.Type)
 		return
 	}
 
@@ -237,7 +237,7 @@ func (m *ConnectionManager) Broadcast(roomID string, message MessageOutgoing) {
 
 	room, ok := m.rooms[roomID]
 	if !ok {
-		log.Println("Broadcast to non-existent room")
+		log.Println("in Broadcast. Broadcast to non-existent room")
 		return
 	}
 

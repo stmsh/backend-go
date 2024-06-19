@@ -204,7 +204,7 @@ func (h *Handlers) HandleSetTimer(sender *ws.Client, msg ws.MessageIncoming) {
 	err := h.rooms.Update(sender.RoomID, func(room *Room) error {
 		user := room.Players[sender.ID]
 		if user.ID != room.HostID {
-			return fmt.Errorf("Only host can change stage")
+			return fmt.Errorf("Only host can set timer")
 		}
 
 		var payload MessageSetTimer
@@ -302,15 +302,13 @@ func (h *Handlers) HandleVote(sender *ws.Client, msg ws.MessageIncoming) {
 		user := room.Players[sender.ID]
 		for i, candidate := range room.Candidates {
 			if candidate.ID == payload.ID {
-				if slices.Contains(candidate.Votes, user.ID) {
+				if slices.Contains(candidate.Voters, user.ID) {
 					return fmt.Errorf("Already voted for %s", candidate.ID)
 				}
 
-				room.Candidates[i].Votes = append(room.Candidates[i].Votes, user.ID)
+				room.Candidates[i].Voters = append(room.Candidates[i].Voters, user.ID)
 				if payload.Vote {
 					room.Candidates[i].Score++
-				} else {
-					room.Candidates[i].Score--
 				}
 			}
 		}
@@ -600,7 +598,7 @@ func collectCandidates(room Room) []Candidate {
 					ListItem:    item,
 					SuggestedBy: id,
 					Score:       0,
-					Votes:       []string{},
+					Voters:      []string{},
 				})
 			}
 		}
@@ -632,7 +630,7 @@ func NewEventStageVoting(room Room) EventStageVoting {
 func collectRemainingCandidates(player Player, room Room) []Candidate {
 	remaining := make([]Candidate, 0, len(room.Candidates))
 	for _, c := range room.Candidates {
-		if slices.Contains(c.Votes, player.ID) {
+		if slices.Contains(c.Voters, player.ID) {
 			continue
 		}
 		remaining = append(remaining, c)

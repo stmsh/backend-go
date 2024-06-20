@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -30,10 +33,35 @@ func init() {
 	}
 }
 
+func IgnorePaths(
+	middleware func(http.Handler) http.Handler,
+	skipPrefixes ...string,
+) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			for _, skipPrefix := range skipPrefixes {
+				if strings.HasPrefix(r.URL.Path, skipPrefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			middleware(next).ServeHTTP(w, r)
+		})
+	}
+}
+
 func main() {
 	roomsRepository := NewInMemoryRoomsRepository()
 
 	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(IgnorePaths(middleware.Logger, "/public"))
+	r.Use(middleware.Recoverer)
+	if os.Getenv("ENABLE_PROFILING") == "true" {
+		r.Mount("/debug", middleware.Profiler())
+	}
 
 	fs := http.FileServer(http.Dir("./public"))
 	r.Handle("/public/*", http.StripPrefix("/public/", fs))
@@ -67,6 +95,7 @@ func main() {
 		roomsRepository.Add(newRoom)
 
 		w.Header().Add("HX-Redirect", fmt.Sprintf("/room/%s", newRoom.ID))
+		w.Write([]byte(newRoom.ID))
 	})
 
 	r.Get("/room/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -136,5 +165,7 @@ func main() {
 	go roomsRepository.RunRoomTimer(manager)
 	go roomsRepository.RunRoomCleanup(manager)
 
-	http.ListenAndServe(":8080", r)
+	addr := fmt.Sprintf(":%s", os.Getenv("PORT"))
+	log.Printf("Starting server on http://localhost%s\n", addr)
+	log.Println(http.ListenAndServe(addr, r))
 }

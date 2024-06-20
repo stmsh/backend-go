@@ -30,7 +30,7 @@ test("happy path", async ({ page, browser }) => {
         })
     );
 
-    await page.getByRole("button", { name: "Ready" }).click();
+    await page.getByRole("checkbox", { name: "Ready" }).click();
     await expect(page.locator("#players summary")).toHaveText(`${n}/${n}`);
 
     await page.getByRole("button", { name: "Next" }).click();
@@ -113,7 +113,7 @@ async function simulateUserAddingSuggestions(
     }
 
     await search.press("Escape");
-    await page.getByRole("button", { name: "Ready" }).click();
+    await page.getByRole("checkbox", { name: "Ready" }).click();
 }
 
 async function swipe(
